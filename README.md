@@ -1,6 +1,8 @@
-# বাকি খাতা (Baki Khata)
+# dFaster Note
 
-A Bangla digital ledger app for shopkeepers, in the style of TallyKhata. It is an Android app (Capacitor) that keeps all data on the phone and works fully offline.
+A Bangla digital ledger (বাকি খাতা) app for shopkeepers, in the style of TallyKhata. It is an Android app (Capacitor) that works fully offline and, after login, keeps every record safely in the user's own cloud account, so a new phone gets everything back.
+
+(The package id `com.dfaster.bakikhata`, this repo name and the `bakikhata.apk` file name are kept from the original "Baki Khata" name.)
 
 - **Download APK:** <https://github.com/mdrbnbd/bakikhata/releases/latest/download/bakikhata.apk>
 - **Landing page:** <https://dfaster.com/bakikhata/> (mirror: <https://dfaster.github.io/bakikhata/>)
@@ -23,8 +25,7 @@ A Bangla digital ledger app for shopkeepers, in the style of TallyKhata. It is a
 - Dark/light mode, Bangla numerals throughout, and a bottom navigation bar with Back.
 - No ads, no tracking, no PWA install prompt.
 
-## Phone login and cloud sync
-The data layer is ready for Firebase phone OTP login with per-user Firestore sync, offline-first. It is **switched off** until a Firebase project exists. See [CLOUD.md](CLOUD.md).
+- **Login and cloud sync (v1.1).** Register with mobile number + password (one SMS OTP to verify the number), then log in with number + password on any phone; or log in with Google. Forgot password works with an OTP. Customers, suppliers, photos, ledger entries, sales, purchases, cash, expenses, products, shop profile and settings sync to Firebase (Firestore, per-user rules) and all come back after login on a new phone. See [CLOUD.md](CLOUD.md).
 
 ## Layout
 ```
@@ -34,12 +35,13 @@ app/                  the app (HTML/CSS/JS, bundled into the APK)
   js/db.js            IndexedDB store with in-memory cache, soft deletes, dirty flags
   js/book.js          accounting: balances, ledger, sale/purchase posting, cash, reports
   js/native.js        SMS / WhatsApp / share via the BakiNative plugin (browser fallbacks)
-  js/cloud.js         phone OTP + sync engine (inactive until firebase-config.js enables it)
+  js/cloud.js         login (phone+password, OTP, Google) + Firestore sync engine (Android app only)
   js/pdf.js           HTML → PDF (html2canvas + jsPDF, vendored)
   js/app.js           screens and router
 android-app/          Capacitor 8 Android project (com.dfaster.bakikhata)
   android/app/src/main/java/com/dfaster/bakikhata/BakiNativePlugin.java
-tools/                icon renderer and the headless-Chrome end-to-end test
+firebase/             firebase.json, Firestore rules (deploy with firebase-tools)
+tools/                icon renderer, headless-Chrome tests, Firestore rules test
 ```
 
 ## Build
@@ -49,13 +51,15 @@ cd android-app && npm install
 ./sync-web.sh && npx cap sync android
 cd android && ./gradlew assembleRelease bundleRelease
 ```
-Releases are signed with a keystore that is kept outside the repo. The paths come from `BAKI_KEYSTORE` and `BAKI_KEYSTORE_PASS_FILE`.
+Releases are signed with a keystore that is kept outside the repo. The paths come from `BAKI_KEYSTORE` and `BAKI_KEYSTORE_PASS_FILE`. `sync-web.sh` copies `google-services.json` from outside the repo (`BAKI_GOOGLE_SERVICES`, default `/workspace/keys/bakikhata-google-services.json`); it is git-ignored.
 
 ## Test
 ```bash
 python3 -m http.server 8231 &          # from the repo root
 node tools/test/e2e.js                  # 35 checks: registration, parties, দিলাম/পেলাম, sales, cash, report+PDF, backup/restore, sync engine, PIN
-node tools/test/otp-mock.js             # 8 checks: OTP registration + restore through the real Firebase adapter with mocked plugins
+node tools/test/cloud-auth.js           # 33 checks: register (OTP+password), login, wrong password, forgot password, Google, logout,
+                                        #   and a full wipe → login → restore of every collection, photo, profile and settings
+cd firebase && npx -y firebase-tools@latest emulators:exec --only firestore --project demo-bk "node ../tools/test/rules.test.js"   # 21 rules checks
 ```
 
 ## Notes

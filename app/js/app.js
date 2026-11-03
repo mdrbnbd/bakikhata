@@ -1,11 +1,11 @@
-/* বাকি খাতা — screens, router, sheets, lock, onboarding */
+/* dFaster Note — screens, router, sheets, lock, onboarding */
 (() => {
 'use strict';
 const {$, $$, esc, money, moneyAbs, bn, ymd} = U;
 const view = $('#view');
 const S = () => DB.meta.get('settings') || {};
 const setS = async patch => DB.meta.set('settings', {...S(), ...patch});
-const VERSION = '1.0.0';
+const VERSION = '1.1.0';
 
 /* ================= router ================= */
 let route = {name: 'home', args: []};
@@ -45,8 +45,8 @@ function applyTheme() {
 }
 function applyProfile() {
   const p = DB.meta.get('profile') || {};
-  $('#shopTitle').textContent = p.shopName || 'বাকি খাতা';
-  $('#subTitle').textContent = p.shopName ? 'বাকি খাতা' + (p.ownerName ? ' · ' + p.ownerName : '') : 'ডিজিটাল দোকানের হিসাব';
+  $('#shopTitle').textContent = p.shopName || 'dFaster Note';
+  $('#subTitle').textContent = p.shopName ? 'dFaster Note' + (p.ownerName ? ' · ' + p.ownerName : '') : 'ডিজিটাল দোকানের হিসাব';
 }
 
 /* ================= sheet ================= */
@@ -141,8 +141,9 @@ function home() {
     <button data-q="customer"><b>➕</b>নতুন কাস্টমার</button>
     <button data-q="remind"><b>🔔</b>তাগাদা</button>
   </div>
+  ${Cloud.enabled() && !Cloud.user() ? `<div class="note warn">☁️ হিসাব এখন শুধু এই ফোনে। <a href="#" id="hLogin">লগইন / রেজিস্ট্রেশন</a> করলে সব হিসাব নিরাপদে ক্লাউডে থাকবে, নতুন ফোনেও ফিরে পাবেন।</div>` : ''}
   ${!S().pinHash ? `<div class="note">🔒 অন্য কেউ যেন আপনার হিসাব দেখতে না পারে — <a href="#/settings">সেটিংসে PIN লক</a> চালু করুন।</div>` : ''}
-  ${!lb || Date.now() - lb > 7 * 864e5 ? `<div class="note warn">💾 ${lb ? 'শেষ ব্যাকআপ ' + bn(Math.floor((Date.now() - lb) / 864e5)) + ' দিন আগে।' : 'এখনও কোনো ব্যাকআপ নেওয়া হয়নি।'} ফোন হারালে হিসাব ফেরত পেতে <a href="#/settings">ব্যাকআপ ফাইল</a> রাখুন।</div>` : ''}
+  ${!Cloud.user() && (!lb || Date.now() - lb > 7 * 864e5) ? `<div class="note warn">💾 ${lb ? 'শেষ ব্যাকআপ ' + bn(Math.floor((Date.now() - lb) / 864e5)) + ' দিন আগে।' : 'এখনও কোনো ব্যাকআপ নেওয়া হয়নি।'} ফোন হারালে হিসাব ফেরত পেতে <a href="#/settings">ব্যাকআপ ফাইল</a> রাখুন।</div>` : ''}
   <h2>সাম্প্রতিক লেনদেন</h2>
   <div class="list" id="recent">${recent.length ? recent.map(r => r.k === 't' ? txnRow(r.x) : r.k === 'c' ? cashRow(r.x) : entryRow(r.x)).join('') : '<div class="empty">এখনও কোনো লেনদেন নেই।<br>উপরের বোতাম থেকে শুরু করুন।</div>'}</div>`;
   $$('[data-go]', view).forEach(b => b.onclick = () => go(b.dataset.go));
@@ -153,6 +154,7 @@ function home() {
        purchase: () => txnForm({type: 'purchase', mode: 'cash'}), expense: () => cashForm({kind: 'expense'}),
        customer: () => partyForm({type: 'customer'}), remind: () => pickParty('customer', p => remind(p), true) })[b.dataset.q]();
   };
+  if ($('#hLogin', view)) $('#hLogin', view).onclick = e => { e.preventDefault(); authScreen(); };
   bindRows(view);
 }
 
@@ -498,7 +500,7 @@ function rangeOf(k) {
 function reportHtml(r, forPdf) {
   const p = DB.meta.get('profile') || {};
   const row = (l, v, cls = '') => `<tr><td>${l}</td><td class="r ${cls}">${v}</td></tr>`;
-  const head = forPdf ? `<div class="pdf-block"><h1>${esc(p.shopName || 'বাকি খাতা')}</h1><div class="sub">${esc([p.ownerName, p.phone && bn(p.phone), p.address].filter(Boolean).join(' · '))}</div><div class="sub"><b>রিপোর্ট:</b> ${U.dateBn(r.from)} — ${U.dateBn(r.to)}</div></div>` : '';
+  const head = forPdf ? `<div class="pdf-block"><h1>${esc(p.shopName || 'dFaster Note')}</h1><div class="sub">${esc([p.ownerName, p.phone && bn(p.phone), p.address].filter(Boolean).join(' · '))}</div><div class="sub"><b>রিপোর্ট:</b> ${U.dateBn(r.from)} — ${U.dateBn(r.to)}</div></div>` : '';
   return `${head}
   <h2>বিক্রয়</h2><table>${row('মোট বিক্রয় (' + bn(r.sale.n) + 'টি)', money(r.sale.total))}${row('নগদে', money(r.sale.paid), 'get')}${row('বাকিতে', money(r.sale.due), 'give')}</table>
   <h2>ক্রয়</h2><table>${row('মোট ক্রয় (' + bn(r.purchase.n) + 'টি)', money(r.purchase.total))}${row('নগদে', money(r.purchase.paid))}${row('বাকিতে', money(r.purchase.due), 'give')}</table>
@@ -524,14 +526,14 @@ function reports() {
   $('#rTo').onchange = e => { repTo = e.target.value; render(); };
   $('#rPdf').onclick = async () => {
     const btn = $('#rPdf'); btn.disabled = true; btn.textContent = '⏳ PDF তৈরি হচ্ছে…';
-    try { await PDF.share(reportHtml(r, true), `bakikhata-report-${from}_${to}.pdf`, 'বাকি খাতা রিপোর্ট'); U.toast('PDF তৈরি হয়েছে'); }
+    try { await PDF.share(reportHtml(r, true), `bakikhata-report-${from}_${to}.pdf`, 'dFaster Note রিপোর্ট'); U.toast('PDF তৈরি হয়েছে'); }
     catch (e) { console.error(e); U.toast('PDF তৈরি হয়নি: ' + e.message); }
     btn.disabled = false; btn.textContent = '📄 PDF শেয়ার / সেভ';
   };
 }
 async function partyPdf(p) {
   const led = Book.ledger(p.id), pr = DB.meta.get('profile') || {}, bal = led.length ? led[led.length - 1].run : 0;
-  const html = `<div class="pdf-block"><h1>${esc(pr.shopName || 'বাকি খাতা')}</h1><div class="sub">${esc([pr.ownerName, pr.phone && bn(pr.phone)].filter(Boolean).join(' · '))}</div>
+  const html = `<div class="pdf-block"><h1>${esc(pr.shopName || 'dFaster Note')}</h1><div class="sub">${esc([pr.ownerName, pr.phone && bn(pr.phone)].filter(Boolean).join(' · '))}</div>
     <h2>হিসাব বিবরণী: ${esc(p.name)}${p.phone ? ' (' + bn(p.phone) + ')' : ''}</h2><div class="sub">${typeBn(p.type)} · ${bal > 0 ? 'মোট পাবো' : bal < 0 ? 'মোট দেবো' : 'হিসাব সমান'}: <b>${moneyAbs(bal)}</b></div></div>
     <table><thead><tr><th>তারিখ</th><th>বিবরণ</th><th class="r">দিলাম</th><th class="r">পেলাম</th><th class="r">ব্যালেন্স</th></tr></thead><tbody>
     ${led.map(e => `<tr><td>${U.dateShort(e.date)}</td><td>${esc(e.note || '')}</td><td class="r give">${e.kind === 'gave' ? money(e.amount) : ''}</td><td class="r get">${e.kind === 'got' ? money(e.amount) : ''}</td><td class="r">${e.run < 0 ? '−' : ''}${moneyAbs(e.run)}</td></tr>`).join('')}
@@ -582,9 +584,11 @@ function settings() {
     <div class="btns"><button class="btn primary" id="sExport">💾 ব্যাকআপ ফাইল</button><button class="btn" id="sImport">📂 ফেরত আনুন</button></div>
     <p class="small muted">${s.lastBackup ? 'শেষ ব্যাকআপ: ' + U.dateBn(ymd(new Date(s.lastBackup))) : 'এখনও ব্যাকআপ নেওয়া হয়নি'} · ফাইলটি Google Drive, WhatsApp বা অন্য ফোনে রেখে দিন। ফেরত আনলে নতুন তথ্য মিলিয়ে নেওয়া হয় (কিছু মুছে যায় না)।</p>
   </div>
-  <h2>ক্লাউড ও লগইন</h2>
+  <h2>অ্যাকাউন্ট ও ক্লাউড</h2>
   <div class="card"><p class="small" id="cloudStatus">${esc(cs.text)}</p>
-    ${cs.on ? (cs.signedIn ? '<div class="btns"><button class="btn primary" id="sSync">🔄 এখন সিঙ্ক</button><button class="btn danger" id="sOut">লগআউট</button></div>' : '<button class="btn primary block" id="sLogin">📱 ফোন নম্বর দিয়ে লগইন</button>') : '<p class="small muted">ফোন নম্বর + OTP দিয়ে লগইন ও ক্লাউডে হিসাব রাখার সুবিধা শীঘ্রই আসছে — তখন ফোন বদলালেও হিসাব ফেরত পাবেন।</p>'}
+    ${cs.on ? (cs.signedIn ? `<p class="small muted">সব হিসাব (কাস্টমার, সাপ্লায়ার, খাতা, বেচাকেনা, ক্যাশ, খরচ, পণ্য, ছবি, দোকানের তথ্য ও সেটিংস) আপনার অ্যাকাউন্টে নিরাপদে সিঙ্ক হয়। নতুন ফোনে একই ${cs.user.providers && cs.user.providers.includes('google.com') && !cs.user.phone ? 'Google অ্যাকাউন্ট' : 'নম্বর + পাসওয়ার্ড'} দিয়ে লগইন করলেই সব ফিরে আসবে।${Cloud.unsynced() ? ` <b>${bn(Cloud.unsynced())}টি পরিবর্তন এখনও আপলোড হয়নি।</b>` : ''}</p>
+      <div class="btns"><button class="btn primary" id="sSync">🔄 এখন সিঙ্ক</button>${cs.user.providers && cs.user.providers.includes('password') ? '<button class="btn" id="sPw">🔑 পাসওয়ার্ড বদলান</button>' : ''}<button class="btn danger" id="sOut">লগআউট</button></div>`
+      : '<button class="btn primary block" id="sLogin">🔐 লগইন / রেজিস্ট্রেশন</button><p class="small muted">লগইন করলে এই ফোনের সব হিসাব আপনার অ্যাকাউন্টে উঠে যাবে।</p>') : ''}
   </div>
   <h2>অন্যান্য</h2>
   <div class="card">
@@ -592,7 +596,7 @@ function settings() {
     <label class="field"><span>থিম</span><select class="input" id="sTheme"><option value="auto">ফোনের মতো</option><option value="light">লাইট</option><option value="dark">ডার্ক</option></select></label>
     <button class="btn block" id="sProd">🏷️ পণ্যের তালিকা</button>
   </div>
-  <p class="small muted" style="text-align:center">বাকি খাতা v${bn(VERSION)} · সব তথ্য আপনার ফোনেই থাকে · কোনো বিজ্ঞাপন বা ট্র্যাকিং নেই</p>`;
+  <p class="small muted" style="text-align:center">dFaster Note v${bn(VERSION)} · কোনো বিজ্ঞাপন বা ট্র্যাকিং নেই</p>`;
   $('#sTheme').value = s.theme || 'auto';
   $('#sSaveP').onclick = async () => {
     const ph = $('#sPhone').value.trim(); if (ph && !U.validBdPhone(ph)) return U.toast('সঠিক মোবাইল নম্বর লিখুন');
@@ -617,14 +621,19 @@ function settings() {
   $('#sOpen').onchange = e => setS({openingCash: U.num(e.target.value)});
   $('#sTheme').onchange = async e => { await setS({theme: e.target.value}); applyTheme(); };
   $('#sProd').onclick = () => go('#/products');
-  if ($('#sLogin')) $('#sLogin').onclick = () => otpFlow(p.phone || '', async () => { await DB.meta.set('profile', {...(DB.meta.get('profile') || p), verified: true}); render(); });
+  if ($('#sLogin')) $('#sLogin').onclick = () => authScreen();
+  if ($('#sPw')) $('#sPw').onclick = () => forgotPassword((cs.user.phone && U.normPhone(cs.user.phone)) || p.phone || '');
   if ($('#sSync')) $('#sSync').onclick = async () => { try { const r = await Cloud.sync(); U.toast(`সিঙ্ক হয়েছে (${bn(r.pushed || 0)}↑ ${bn(r.pulled || 0)}↓)`); render(); } catch (e) { U.toast('সিঙ্ক হয়নি: ' + e.message); } };
-  if ($('#sOut')) $('#sOut').onclick = async () => { await Cloud.signOut(); render(); };
+  if ($('#sOut')) $('#sOut').onclick = async () => {
+    if (!await confirmSheet('লগআউট করবেন?', 'আগে সব হিসাব ক্লাউডে সিঙ্ক হবে, তারপর এই ফোন থেকে মুছে যাবে। আবার লগইন করলে সব ফিরে আসবে।' + (navigator.onLine === false ? ' <b>এখন ইন্টারনেট নেই — যেগুলো আপলোড হয়নি সেগুলো হারাবে।</b>' : ''), 'লগআউট')) return;
+    try { await Cloud.sync(); } catch (e) { if (!await confirmSheet('সিঙ্ক হয়নি', esc(e.message) + ' — তবুও লগআউট করলে আপলোড না হওয়া হিসাব হারাবে।', 'তবুও লগআউট')) return; }
+    await Cloud.signOut(); location.hash = '#/'; location.reload();
+  };
 }
 async function exportBackup() {
   try {
     const data = DB.exportAll();
-    await Native.shareFile(`bakikhata-backup-${ymd()}.json`, 'application/json', Native.utf8b64(JSON.stringify(data)), 'বাকি খাতা ব্যাকআপ');
+    await Native.shareFile(`bakikhata-backup-${ymd()}.json`, 'application/json', Native.utf8b64(JSON.stringify(data)), 'dFaster Note ব্যাকআপ');
     await setS({lastBackup: Date.now()}); U.toast('ব্যাকআপ ফাইল তৈরি হয়েছে');
   } catch (e) { U.toast('ব্যাকআপ হয়নি: ' + e.message); }
 }
@@ -667,10 +676,10 @@ function pinPad(title, sub, onPin, opts = {}) {
 let hiddenAt = 0;
 function showLock() {
   const s = S(); if (!s.pinHash) return;
-  pinPad('বাকি খাতা লক করা', '৪ অঙ্কের PIN দিন', async pin => {
+  pinPad('dFaster Note লক করা', '৪ অঙ্কের PIN দিন', async pin => {
     if (await U.sha256(s.pinSalt + pin) === s.pinHash) { $('#lock').classList.add('hidden'); return true; }
     return false;
-  }, {forgot: () => U.toast(Cloud.enabled() ? 'লগইন করা ফোন নম্বরে OTP যাচাই করে PIN বদলানো যাবে।' : 'PIN ছাড়া খোলা যাবে না। অ্যাপের ডেটা মুছে আবার চালু করে ব্যাকআপ ফাইল থেকে হিসাব ফেরত আনুন।', 6000)});
+  }, {forgot: () => U.toast(Cloud.user() ? 'PIN ভুলে গেলে: ফোনের Settings → Apps → dFaster Note → Clear data করে আবার লগইন করুন — ক্লাউড থেকে সব হিসাব ফিরে আসবে।' : 'PIN ছাড়া খোলা যাবে না। অ্যাপের ডেটা মুছে আবার চালু করে ব্যাকআপ ফাইল থেকে হিসাব ফেরত আনুন।', 6000)});
 }
 function setPin() {
   const cancel = () => {};
@@ -688,56 +697,161 @@ document.addEventListener('visibilitychange', () => {
   else if (S().pinHash && hiddenAt && Date.now() - hiddenAt > 60000 && $('#lock').classList.contains('hidden')) showLock();
 });
 
-/* ================= ONBOARDING / REGISTRATION ================= */
-function onboarding() {
-  const el = $('#onboard'), cloud = Cloud.enabled();
-  el.innerHTML = `<div class="inner"><div class="hero"><img class="logo" src="icons/icon-192.png" alt="" style="display:block;background:none"><h1>বাকি খাতা</h1><p class="muted">দোকানের বাকি, বেচাকেনা আর ক্যাশের হিসাব — সহজে, বাংলায়</p></div>
-    <div class="card">
-      <h2 style="margin-top:0">${cloud ? 'রেজিস্ট্রেশন / লগইন' : 'রেজিস্ট্রেশন — দোকানের তথ্য দিন'}</h2>
-      <label class="field"><span>দোকানের নাম *</span><input class="input" id="oShop" placeholder="যেমন: মায়ের দোয়া স্টোর" autocomplete="organization"></label>
-      <label class="field"><span>মালিকের নাম *</span><input class="input" id="oOwner" autocomplete="name"></label>
-      <label class="field"><span>মোবাইল নম্বর *</span><input class="input" id="oPhone" type="tel" inputmode="tel" placeholder="01XXXXXXXXX" autocomplete="tel"></label>
-      <button class="btn primary block" id="oGo">${cloud ? '📩 OTP পাঠান' : 'শুরু করুন →'}</button>
-      ${cloud ? '' : '<div class="note small">এখন সব হিসাব শুধু এই ফোনে থাকবে। ফোন নম্বর + OTP দিয়ে লগইন ও ক্লাউড ব্যাকআপ শীঘ্রই চালু হবে — তখন এই নম্বর দিয়েই লগইন করবেন, আর ফোন বদলালেও হিসাব ফেরত পাবেন।</div>'}
+/* ================= ONBOARDING / REGISTRATION / LOGIN ================= */
+function onboarding() { if (Cloud.enabled()) authScreen(); else localSetup(); }
+const finishOnboard = (msg = 'স্বাগতম! 🎉') => {
+  $('#onboard').classList.add('hidden'); applyProfile(); applyTheme();
+  if (location.hash && location.hash !== '#/') location.hash = '#/'; else render();
+  U.toast(msg);
+};
+// web demo / local-only: the shop form, saved on this device
+function localSetup() {
+  const el = $('#onboard');
+  el.innerHTML = `<div class="inner"><div class="hero"><img class="logo" src="icons/icon-192.png" alt="" style="display:block;background:none"><h1>dFaster Note</h1><p class="muted">দোকানের বাকি, বেচাকেনা আর ক্যাশের হিসাব — সহজে, বাংলায়</p></div>
+    <div class="card"><h2 style="margin-top:0">দোকানের তথ্য দিন</h2>${shopFields()}
+      <button class="btn primary block" id="oGo">শুরু করুন →</button>
+      ${Cloud.enabled() ? '<p style="text-align:center"><a href="#" id="oAuth">← লগইন / রেজিস্ট্রেশন</a></p>' : '<div class="note small">এখানে সব হিসাব শুধু এই ডিভাইসে থাকবে। মোবাইল নম্বর + পাসওয়ার্ড বা Google দিয়ে লগইন আর ক্লাউড সিঙ্ক — Android অ্যাপে।</div>'}
     </div>
     <p style="text-align:center"><a href="#" id="oRestore">📂 পুরোনো ব্যাকআপ ফাইল থেকে ফেরত আনুন</a></p>
     <p class="credit">Powered by Robin · dFaster.com</p></div>`;
   el.classList.remove('hidden');
   $('#oGo', el).onclick = async () => {
-    const shop = $('#oShop', el).value.trim(), owner = $('#oOwner', el).value.trim(), phone = $('#oPhone', el).value.trim();
-    if (!shop) return U.toast('দোকানের নাম লিখুন');
-    if (!owner) return U.toast('মালিকের নাম লিখুন');
-    if (!U.validBdPhone(phone)) return U.toast('সঠিক মোবাইল নম্বর লিখুন (01XXXXXXXXX)');
-    const profile = {shopName: shop, ownerName: owner, phone: U.normPhone(phone), registeredAt: Date.now(), verified: false};
-    if (!cloud) { await DB.meta.set('profile', profile); finish(); return; }
-    otpFlow(phone, async () => { await DB.meta.set('profile', {...(DB.meta.get('profile') || profile), verified: true}); finish(); }, profile);
+    const pr = readShop(el); if (!pr) return;
+    await DB.meta.set('profile', {...pr, registeredAt: Date.now(), verified: false}); finishOnboard();
   };
-  $('#oRestore', el).onclick = e => { e.preventDefault(); importBackup(() => { if (DB.meta.get('profile')) finish(); else U.toast('ফাইলে দোকানের তথ্য নেই — উপরের ফর্মটি পূরণ করুন'); }); };
-  function finish() { el.classList.add('hidden'); applyProfile(); if (location.hash && location.hash !== '#/') location.hash = '#/'; else render(); U.toast('স্বাগতম! 🎉'); }
+  if ($('#oAuth', el)) $('#oAuth', el).onclick = e => { e.preventDefault(); authScreen(); };
+  $('#oRestore', el).onclick = e => { e.preventDefault(); importBackup(() => { if (DB.meta.get('profile')) finishOnboard(); else U.toast('ফাইলে দোকানের তথ্য নেই — উপরের ফর্মটি পূরণ করুন'); }); };
 }
-// OTP sheet (only reachable when Cloud is enabled)
-function otpFlow(phone, onOk, profile) {
+const shopFields = (p = {}, withPhone = true) => `
+  <label class="field"><span>দোকানের নাম *</span><input class="input" id="oShop" placeholder="যেমন: মায়ের দোয়া স্টোর" autocomplete="organization" value="${esc(p.shopName || '')}"></label>
+  <label class="field"><span>মালিকের নাম *</span><input class="input" id="oOwner" autocomplete="name" value="${esc(p.ownerName || '')}"></label>
+  ${withPhone ? `<label class="field"><span>মোবাইল নম্বর *</span><input class="input" id="oPhone" type="tel" inputmode="tel" placeholder="01XXXXXXXXX" autocomplete="tel" value="${esc(p.phone || '')}"></label>` : ''}`;
+function readShop(el, withPhone = true) {
+  const shopName = $('#oShop', el).value.trim(), ownerName = $('#oOwner', el).value.trim(), phone = withPhone ? $('#oPhone', el).value.trim() : '';
+  if (!shopName) return U.toast('দোকানের নাম লিখুন'), null;
+  if (!ownerName) return U.toast('মালিকের নাম লিখুন'), null;
+  if (withPhone && !U.validBdPhone(phone)) return U.toast('সঠিক মোবাইল নম্বর লিখুন (01XXXXXXXXX)'), null;
+  return {shopName, ownerName, phone: phone ? U.normPhone(phone) : ''};
+}
+const pwField = (id, label, auto = 'current-password') => `<label class="field"><span>${label}</span><span class="pw"><input class="input" id="${id}" type="password" autocomplete="${auto}" minlength="6"><button type="button" class="eye" data-eye="${id}" aria-label="পাসওয়ার্ড দেখান">👁</button></span></label>`;
+function wireEyes(root) {
+  $$('[data-eye]', root).forEach(b => b.onclick = () => {
+    const i = $('#' + b.dataset.eye, root), show = i.type === 'password';
+    i.type = show ? 'text' : 'password'; b.textContent = show ? '🙈' : '👁'; b.setAttribute('aria-label', show ? 'পাসওয়ার্ড লুকান' : 'পাসওয়ার্ড দেখান');
+  });
+}
+function checkPw(a, b) {
+  if (a.length < 6) return U.toast('পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের দিন'), false;
+  if (b !== undefined && a !== b) return U.toast('দুটি পাসওয়ার্ড মেলেনি'), false;
+  return true;
+}
+const busy = async (btn, label, f) => { const t = btn.innerHTML; btn.disabled = true; btn.innerHTML = '⏳ ' + label; try { return await f(); } finally { btn.disabled = false; btn.innerHTML = t; } };
+// after any successful login: make sure there is a shop profile (Google users / brand-new accounts), then enter
+async function afterLogin(msg) {
+  const p = DB.meta.get('profile');
+  if (p && p.shopName) return finishOnboard(msg);
+  const u = Cloud.user() || {}, el = $('#onboard');
+  el.innerHTML = `<div class="inner"><div class="hero"><img class="logo" src="icons/icon-192.png" alt="" style="display:block;background:none"><h1>দোকানের তথ্য</h1><p class="muted">লগইন হয়েছে ✅ ${esc(u.phone ? U.bn(U.normPhone(u.phone)) : (u.email || ''))}</p></div>
+    <div class="card">${shopFields({ownerName: u.name || '', phone: u.phone ? U.normPhone(u.phone) : ''})}<button class="btn primary block" id="oGo">শুরু করুন →</button></div>
+    <p class="credit">Powered by Robin · dFaster.com</p></div>`;
+  el.classList.remove('hidden');
+  $('#oGo', el).onclick = async () => {
+    const pr = readShop(el); if (!pr) return;
+    await DB.meta.set('profile', {...(DB.meta.get('profile') || {}), ...pr, registeredAt: Date.now(), verified: true});
+    Cloud.schedule(); finishOnboard();
+  };
+}
+function authScreen(tab = 'login') {
+  const el = $('#onboard');
+  el.innerHTML = `<div class="inner"><div class="hero"><img class="logo" src="icons/icon-192.png" alt="" style="display:block;background:none"><h1>dFaster Note</h1><p class="muted">দোকানের বাকি, বেচাকেনা আর ক্যাশের হিসাব — নিরাপদে ক্লাউডে, যেকোনো ফোনে</p></div>
+    <div class="tabs" id="aTabs"><button data-tab="login">লগইন</button><button data-tab="reg">রেজিস্ট্রেশন</button></div>
+    <div class="card" id="aLogin">
+      <label class="field"><span>মোবাইল নম্বর</span><input class="input" id="aPh" type="tel" inputmode="tel" placeholder="01XXXXXXXXX" autocomplete="tel"></label>
+      ${pwField('aPw', 'পাসওয়ার্ড')}
+      <button class="btn primary block" id="aGo">লগইন</button>
+      <p style="text-align:center;margin:12px 0 0"><a href="#" id="aForgot">পাসওয়ার্ড ভুলে গেছেন?</a></p>
+    </div>
+    <div class="card" id="aReg">${shopFields()}
+      ${pwField('rPw', 'পাসওয়ার্ড দিন (কমপক্ষে ৬ অক্ষর)', 'new-password')}${pwField('rPw2', 'আবার পাসওয়ার্ড দিন', 'new-password')}
+      <button class="btn primary block" id="rGo">📩 OTP পাঠিয়ে রেজিস্ট্রেশন</button>
+      <p class="small muted" style="margin:10px 0 0">নম্বরটি আপনার কিনা যাচাই করতে একবার SMS কোড (OTP) যাবে। এরপর শুধু নম্বর + পাসওয়ার্ড দিয়ে যেকোনো ফোনে লগইন।</p>
+    </div>
+    <div class="or"><span>অথবা</span></div>
+    <button class="btn block google" id="aGoogle"><b class="g">G</b> Google দিয়ে লগইন</button>
+    <p class="small muted" style="text-align:center">লগইন করলে সব হিসাব (কাস্টমার, সাপ্লায়ার, খাতা, বেচাকেনা, ক্যাশ, খরচ, ছবি) আপনার অ্যাকাউন্টে নিরাপদে থাকে — নতুন ফোনে লগইন করলেই সব ফিরে আসে।</p>
+    <p style="text-align:center" class="small"><a href="#" id="oRestore">📂 ব্যাকআপ ফাইল থেকে ফেরত আনুন</a> · <a href="#" id="aLocal">লগইন ছাড়া চালান</a></p>
+    <p class="credit">Powered by Robin · dFaster.com</p></div>`;
+  el.classList.remove('hidden');
+  const show = t => { $$('#aTabs button', el).forEach(b => b.classList.toggle('on', b.dataset.tab === t)); $('#aLogin', el).classList.toggle('hidden', t !== 'login'); $('#aReg', el).classList.toggle('hidden', t !== 'reg'); };
+  show(tab);
+  $('#aTabs', el).onclick = e => { const b = e.target.closest('button'); if (b) show(b.dataset.tab); };
+  wireEyes(el);
+  $('#aGo', el).onclick = async e => {
+    const ph = $('#aPh', el).value.trim(), pw = $('#aPw', el).value;
+    if (!U.validBdPhone(ph)) return U.toast('সঠিক মোবাইল নম্বর লিখুন (01XXXXXXXXX)');
+    if (!pw) return U.toast('পাসওয়ার্ড লিখুন');
+    try { await busy(e.currentTarget, 'লগইন হচ্ছে…', () => Cloud.loginPassword(ph, pw)); afterLogin('✅ লগইন হয়েছে — হিসাব ফেরত আনা হয়েছে'); }
+    catch (err) { U.toast(err.message, 4000); }
+  };
+  $('#aForgot', el).onclick = e => { e.preventDefault(); forgotPassword($('#aPh', el).value.trim()); };
+  $('#rGo', el).onclick = async () => {
+    const pr = readShop(el); if (!pr) return;
+    const pw = $('#rPw', el).value; if (!checkPw(pw, $('#rPw2', el).value)) return;
+    await DB.meta.set('profile', {...pr, registeredAt: Date.now(), verified: false});   // kept only if the account has no saved shop yet
+    otpFlow(pr.phone, async () => {
+      await Cloud.setPassword(pr.phone, pw);
+      afterLogin('✅ রেজিস্ট্রেশন হয়েছে');
+    }, {title: '📱 নম্বর যাচাই', lock: true});
+  };
+  $('#aGoogle', el).onclick = async e => {
+    try { await busy(e.currentTarget, 'Google…', () => Cloud.loginGoogle()); afterLogin('✅ Google দিয়ে লগইন হয়েছে'); }
+    catch (err) { U.toast('Google লগইন হয়নি: ' + err.message, 4000); }
+  };
+  $('#aLocal', el).onclick = e => { e.preventDefault(); localSetup(); };
+  $('#oRestore', el).onclick = e => { e.preventDefault(); importBackup(() => { if (DB.meta.get('profile')) finishOnboard(); else U.toast('ফাইলে দোকানের তথ্য নেই'); }); };
+}
+function forgotPassword(phone) {
+  openSheet(`<h2>🔑 নতুন পাসওয়ার্ড</h2><p class="small muted">নম্বরে SMS কোড (OTP) যাবে। যাচাই হলে নতুন পাসওয়ার্ড দিন।</p>
+    <label class="field"><span>মোবাইল নম্বর</span><input class="input" id="fPh" type="tel" inputmode="tel" value="${esc(phone || '')}"></label>
+    ${pwField('fPw', 'নতুন পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)', 'new-password')}${pwField('fPw2', 'আবার নতুন পাসওয়ার্ড', 'new-password')}
+    <button class="btn primary block" id="fGo">📩 OTP পাঠান</button>`, c => {
+    wireEyes(c);
+    $('#fGo', c).onclick = () => {
+      const ph = $('#fPh', c).value.trim(), pw = $('#fPw', c).value;
+      if (!U.validBdPhone(ph)) return U.toast('সঠিক মোবাইল নম্বর লিখুন');
+      if (!checkPw(pw, $('#fPw2', c).value)) return;
+      otpFlow(ph, async () => { await Cloud.setPassword(ph, pw); afterLogin('✅ নতুন পাসওয়ার্ড সেট হয়েছে'); }, {title: '🔑 নম্বর যাচাই', lock: true});
+    };
+  });
+}
+// OTP sheet: sends the code right away; onOk runs after the phone is verified (user is signed in to Firebase)
+function otpFlow(phone, onOk, {title = '📱 ফোন নম্বর যাচাই'} = {}) {
   let vid = null;
-  openSheet(`<h2>📱 ফোন নম্বর যাচাই</h2>
-    <label class="field"><span>মোবাইল নম্বর</span><input class="input" id="otpPh" type="tel" value="${esc(phone)}"></label>
-    <button class="btn primary block" id="otpSend">OTP পাঠান</button>
-    <div id="otpW" class="hidden" style="margin-top:12px"><label class="field"><span>SMS-এ আসা ৬ অঙ্কের কোড</span><input class="input amount" id="otpC" inputmode="numeric" maxlength="6" autocomplete="one-time-code"></label>
-    <button class="btn primary block" id="otpOk">যাচাই করুন</button></div>`, c => {
-    $('#otpSend', c).onclick = async () => {
-      const ph = $('#otpPh', c).value.trim(); if (!U.validBdPhone(ph)) return U.toast('সঠিক মোবাইল নম্বর লিখুন');
-      const b = $('#otpSend', c); b.disabled = true; b.textContent = '⏳ পাঠানো হচ্ছে…';
+  const ok = async c => {
+    try { await onOk(); closeSheet(); }
+    catch (e) { U.toast(e.message, 4500); if (c) { const b = $('#otpOk', c); if (b) b.disabled = false; } }
+  };
+  openSheet(`<h2>${esc(title)}</h2><p class="small muted" id="otpMsg">${esc(U.bn(U.normPhone(phone)))} নম্বরে ৬ অঙ্কের কোড পাঠানো হচ্ছে…</p>
+    <div id="otpW"><label class="field"><span>SMS-এ আসা ৬ অঙ্কের কোড</span><input class="input amount" id="otpC" inputmode="numeric" maxlength="6" autocomplete="one-time-code"></label>
+    <button class="btn primary block" id="otpOk" disabled>যাচাই করুন</button>
+    <p style="text-align:center;margin:10px 0 0"><button class="btn" id="otpSend" disabled>আবার পাঠান</button></p></div>`, c => {
+    const send = async () => {
+      const b = $('#otpSend', c); b.disabled = true;
       try {
-        if (profile) await DB.meta.set('profile', {...profile, phone: U.normPhone(ph)});
-        const r = await Cloud.sendOtp(ph);
-        if (r.user) { await Cloud.completeSignIn(r.user); closeSheet(); return onOk(); }   // Android auto-verified the SMS
-        vid = r.verificationId; $('#otpW', c).classList.remove('hidden'); b.textContent = 'আবার পাঠান'; $('#otpC', c).focus();
-      } catch (e) { U.toast('OTP পাঠানো যায়নি: ' + e.message); b.textContent = 'OTP পাঠান'; }
-      b.disabled = false;
+        const r = await Cloud.sendOtp(phone);
+        if (r.user) { U.toast('✅ নম্বর নিজে থেকেই যাচাই হয়েছে'); return ok(c); }   // Android auto-verified the SMS
+        vid = r.verificationId; $('#otpOk', c).disabled = false; $('#otpMsg', c).textContent = `${U.bn(U.normPhone(phone))} নম্বরে SMS-এ কোড পাঠানো হয়েছে।`; $('#otpC', c).focus(); U.toast('কোড পাঠানো হয়েছে');
+      } catch (e) { U.toast('OTP পাঠানো যায়নি: ' + e.message, 5000); }
+      setTimeout(() => { if ($('#otpSend', c)) $('#otpSend', c).disabled = false; }, 30000);
     };
-    $('#otpOk', c).onclick = async () => {
-      try { await Cloud.confirmOtp(vid, $('#otpC', c).value); closeSheet(); U.toast('✅ যাচাই হয়েছে'); onOk(); }
-      catch (e) { U.toast('কোড মেলেনি: ' + e.message); }
+    $('#otpSend', c).onclick = send;
+    $('#otpOk', c).onclick = async e => {
+      const code = U.toAscii($('#otpC', c).value); if (!/^\d{6}$/.test(code)) return U.toast('৬ অঙ্কের কোড লিখুন');
+      e.currentTarget.disabled = true;
+      try { await Cloud.confirmOtp(vid, code); } catch (err) { e.currentTarget.disabled = false; return U.toast(err.message); }
+      ok(c);
     };
+    send();
   });
 }
 

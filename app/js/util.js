@@ -1,4 +1,4 @@
-/* বাকি খাতা — helpers: Bangla numerals, money, dates, ids, DOM, toast */
+/* dFaster Note — helpers: Bangla numerals, money, dates, ids, DOM, toast */
 (() => {
 'use strict';
 const BN = '০১২৩৪৫৬৭৮৯';

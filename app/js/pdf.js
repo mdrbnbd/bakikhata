@@ -1,4 +1,4 @@
-/* বাকি খাতা — PDF export. Renders a light-theme A4 page in the browser (perfect Bangla shaping),
+/* dFaster Note — PDF export. Renders a light-theme A4 page in the browser (perfect Bangla shaping),
    rasterises it with html2canvas and paginates at row/section boundaries into jsPDF (both bundled, MIT). */
 (() => {
 'use strict';
@@ -10,7 +10,7 @@ async function build(html, {title = 'report'} = {}) {
   await Promise.all([load('vendor/html2canvas.min.js'), load('vendor/jspdf.umd.min.js')]);
   await document.fonts.ready;
   const stage = U.$('#pdfStage');
-  stage.innerHTML = `<div class="pdf-doc">${html}<div class="pdf-foot">বাকি খাতা · Powered by Robin · dFaster.com · ${U.dateBn(U.ymd())}</div></div>`;
+  stage.innerHTML = `<div class="pdf-doc">${html}<div class="pdf-foot">dFaster Note · Powered by Robin · dFaster.com · ${U.dateBn(U.ymd())}</div></div>`;
   const doc = stage.firstElementChild;
   const W = 794, H = 1123;               // A4 @ 96 dpi
   const top = doc.getBoundingClientRect().top;

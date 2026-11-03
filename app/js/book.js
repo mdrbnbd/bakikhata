@@ -1,4 +1,4 @@
-/* বাকি খাতা — business rules.
+/* dFaster Note — business rules.
    Party balance = Σ দিলাম − Σ পেলাম.  > 0 → পাবো (they owe the shop), < 0 → দেবো (shop owes them).
    Customer: দিলাম = বাকিতে মাল/টাকা দিলাম, পেলাম = টাকা পেলাম.  Supplier: পেলাম = বাকিতে মাল পেলাম, দিলাম = টাকা দিলাম.
    বিক্রয়/ক্রয়: paid part → ক্যাশবক্স, unpaid (বাকি) part → party ledger (sale → দিলাম, purchase → পেলাম). */

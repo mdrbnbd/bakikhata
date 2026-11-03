@@ -1,6 +1,7 @@
-/* বাকি খাতা — cloud switch.
-   null  = cloud OFF (current state): registration is saved on this phone only, no OTP, no sync.
-   To turn it on (after the Firebase project exists and google-services.json is in android-app/android/app/):
-     window.BK_FIREBASE = { enabled: true, projectId: "<firebase project id>" };
-   and install @capacitor-firebase/authentication + @capacitor-firebase/firestore in android-app/. See CLOUD.md. */
-window.BK_FIREBASE = null;
+/* dFaster Note — cloud switch.
+   enabled:true turns on login + cloud sync, but only inside the Android app (it needs the native
+   @capacitor-firebase plugins + google-services.json, which are bundled at build time). The web demo
+   has no plugins, so it automatically stays local-only. See CLOUD.md.
+   phoneEmailDomain: phone+password login uses a synthetic email 8801XXXXXXXXX@<domain> linked to the
+   phone-verified account (never shown to the user, never receives mail). Do not change it after launch. */
+window.BK_FIREBASE = { enabled: true, projectId: "baki-khata-7e633", phoneEmailDomain: "phone.dfaster.com" };

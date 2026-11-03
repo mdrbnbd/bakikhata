@@ -1,0 +1,42 @@
+rules_version = '2';
+// dFaster Note: each signed-in shop owner can reach only users/{their uid}/**. Everything else is denied.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+    function smallString(v, n) { return v is string && v.size() <= n; }
+
+    // account document: shop profile + synced app settings
+    match /users/{uid} {
+      allow get, delete: if isOwner(uid);
+      allow list: if false;
+      allow create, update: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(['profile', 'settings', 'updatedAt'])
+        && request.resource.data.updatedAt is number
+        && (!('profile' in request.resource.data) || (request.resource.data.profile is map && request.resource.data.profile.size() <= 20))
+        && (!('settings' in request.resource.data) || (request.resource.data.settings is map && request.resource.data.settings.size() <= 40));
+    }
+
+    // synced ledger rows: parties, entries, txns, cash, products
+    match /users/{uid}/{store}/{id} {
+      function validRow() {
+        let d = request.resource.data;
+        return d.id == id
+          && smallString(id, 64)
+          && d.createdAt is number && d.updatedAt is number
+          && d.deleted in [0, 1]
+          && d.keys().size() <= 40
+          && (!('name' in d) || smallString(d.name, 200))
+          && (!('note' in d) || smallString(d.note, 1000))
+          && (!('photo' in d) || d.photo == null || smallString(d.photo, 400000))
+          && (!('amount' in d) || d.amount is number)
+          && (!('items' in d) || (d.items is list && d.items.size() <= 200));
+      }
+      allow read: if isOwner(uid) && store in ['parties', 'entries', 'txns', 'cash', 'products'];
+      allow create, update: if isOwner(uid) && store in ['parties', 'entries', 'txns', 'cash', 'products'] && validRow();
+      // rows are soft-deleted (deleted: 1) so other phones learn about it; hard deletes only for own data
+      allow delete: if isOwner(uid);
+    }
+  }
+}

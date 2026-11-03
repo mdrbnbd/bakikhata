@@ -1,0 +1,17 @@
+{
+  "firestore": {
+    "database": "(default)",
+    "location": "asia-south1",
+    "rules": "firestore.rules"
+  },
+  "auth": {
+    "providers": {
+      "emailPassword": true,
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "dFaster Note",
+        "supportEmail": "md.rbnbd@gmail.com",
+        "authorizedRedirectUris": ["https://dfaster.com"]
+      }
+    }
+  }
+}

@@ -1,4 +1,4 @@
-/* বাকি খাতা — phone features: SMS (open SMS app / auto-send), WhatsApp, share files.
+/* dFaster Note — phone features: SMS (open SMS app / auto-send), WhatsApp, share files.
    In the Android app these go through the BakiNative plugin (android-app/.../BakiNativePlugin.java);
    in a browser they fall back to sms:/wa.me links and file downloads. */
 (() => {
@@ -50,7 +50,7 @@ async function shareFile(filename, mime, base64, title) {
 const utf8b64 = s => { const u8 = new TextEncoder().encode(s); let b = ''; for (let i = 0; i < u8.length; i += 0x8000) b += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(b); };
 
 /* ---------- SMS texts (Bangla) ---------- */
-function shopSign() { const p = profile(); return p.shopName ? p.shopName + (p.phone ? ' (' + U.bn(p.phone) + ')' : '') : 'বাকি খাতা'; }
+function shopSign() { const p = profile(); return p.shopName ? p.shopName + (p.phone ? ' (' + U.bn(p.phone) + ')' : '') : 'dFaster Note'; }
 function balLine(bal) {
   if (bal > 0) return `মোট বাকি: ${U.money(bal)}`;
   if (bal < 0) return `আপনার পাওনা: ${U.moneyAbs(bal)}`;

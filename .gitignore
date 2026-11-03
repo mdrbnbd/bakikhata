@@ -8,3 +8,4 @@ tools/package-lock.json
 google-services.json
 .DS_Store
 tools/icon/master-*.png
+*-debug.log

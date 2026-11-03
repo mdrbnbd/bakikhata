@@ -1,4 +1,4 @@
-/* বাকি খাতা — mobile-first, light/dark */
+/* dFaster Note — mobile-first, light/dark */
 :root{
   --font:"Hind Siliguri","Noto Sans Bengali","SolaimanLipi",system-ui,sans-serif;
   --bg:#f3f6f4;--card:#fff;--text:#14211b;--muted:#5f6f67;--line:#e2e8e4;
@@ -166,3 +166,11 @@ main{max-width:720px;margin:0 auto;padding:12px}
 .pdf-foot{margin-top:24px;color:#777;font-size:12px;text-align:center;border-top:1px solid #ddd;padding-top:8px}
 @media(min-width:700px){.quick{grid-template-columns:repeat(8,1fr)}}
 #lock{z-index:95}
+/* login / registration */
+.pw{position:relative;display:block}
+.pw .input{padding-right:48px}
+.pw .eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);border:0;background:none;font-size:1.15rem;padding:8px;cursor:pointer;line-height:1}
+.or{display:flex;align-items:center;gap:10px;color:var(--muted);margin:14px 2px;font-size:.9rem}
+.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+.btn.google{background:var(--card);color:var(--text,inherit);border:1px solid var(--line);margin-bottom:10px}
+.btn.google .g{font:700 1.1rem/1 Arial,sans-serif;color:#4285f4}

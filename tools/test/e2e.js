@@ -106,7 +106,7 @@ const ok = (c, m) => { if (c) { pass++; console.log('✔', m); } else { fail++; 
   const sync = await pg.evaluate(async () => {
     const cloud = {}; const col = (u, s) => (cloud[u + '/' + s] = cloud[u + '/' + s] || new Map());
     Cloud._setAdapter({name: 'mem', pull: async (u, s, since) => [...col(u, s).values()].filter(r => r.updatedAt > since).map(r => ({...r})),
-      push: async (u, s, rows) => rows.forEach(({dirty, ...r}) => col(u, s).set(r.id, r)), putProfile: async () => {}, getProfile: async () => null,
+      push: async (u, s, rows) => rows.forEach(({dirty, ...r}) => col(u, s).set(r.id, r)), putAccount: async () => {}, getAccount: async () => null,
       signOut: async () => {}});
     await DB.meta.set('cloudUser', {uid: 'u1', phone: '+8801712345678'});
     const a = await Cloud.sync();

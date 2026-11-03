@@ -1,4 +1,4 @@
-/* বাকি খাতা — on-device storage (IndexedDB, write-through in-memory cache).
+/* dFaster Note — on-device storage (IndexedDB, write-through in-memory cache).
    Every synced record carries: id (uuid), createdAt, updatedAt (ms), deleted (0/1 tombstone), dirty (1 = not yet pushed to cloud).
    That makes the store "offline-first": the app always reads/writes locally; cloud.js can later push dirty rows
    and pull newer rows (last-writer-wins on updatedAt) without changing any screen code. */
@@ -7,6 +7,7 @@
 const NAME = 'bakikhata', VERSION = 1;
 const SYNCED = ['parties', 'entries', 'txns', 'cash', 'products'];
 const STORES = [...SYNCED, 'meta'];
+const STAMPED = ['profile', 'settings'];
 let idb = null;
 const mem = {};
 STORES.forEach(s => mem[s] = new Map());
@@ -87,7 +88,11 @@ async function putMany(items) {
 }
 const meta = {
   get: (k, d = null) => mem.meta.has(k) ? mem.meta.get(k) : d,
-  async set(k, v) { await tx('meta', 'readwrite', os => os.put({key: k, value: v})); mem.meta.set(k, v); notify('meta', {key: k, value: v}); }
+  // profile/settings carry _at (last local edit) so cloud sync can resolve them last-writer-wins
+  async set(k, v, {fromSync = false} = {}) {
+    if (STAMPED.includes(k) && v && typeof v === 'object' && !fromSync) v = {...v, _at: Date.now()};
+    await tx('meta', 'readwrite', os => os.put({key: k, value: v})); mem.meta.set(k, v); notify('meta', {key: k, value: v});
+  }
 };
 // ---- sync helpers (used by cloud.js) ----
 const dirty = store => [...mem[store].values()].filter(r => r.dirty);
@@ -114,7 +119,7 @@ function exportAll() {
 }
 function publicSettings() { const s = {...(meta.get('settings') || {})}; return s; }
 async function importMerge(obj) {
-  if (!obj || obj.app !== 'bakikhata' || !obj.data) throw new Error('এটি বাকি খাতার ব্যাকআপ ফাইল নয়');
+  if (!obj || obj.app !== 'bakikhata' || !obj.data) throw new Error('এটি dFaster Note-এর ব্যাকআপ ফাইল নয়');
   let n = 0;
   for (const s of SYNCED) for (const row of (obj.data[s] || [])) { if (await mergeRemote(s, {...row}, true)) n++; }
   if (obj.profile && !meta.get('profile')) await meta.set('profile', obj.profile);
