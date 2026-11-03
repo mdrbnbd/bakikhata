@@ -1,0 +1,13 @@
+{
+  "name": "bakikhata-tools",
+  "private": true,
+  "description": "Dev tools: vendored PDF libs source (copied to app/vendor), icon renderer, e2e test (uses /workspace/shotkit puppeteer-core)",
+  "scripts": {
+    "icons": "node icon/make-icons.js",
+    "test": "node test/e2e.js"
+  },
+  "dependencies": {
+    "html2canvas": "^1.4.1",
+    "jspdf": "^2.5.2"
+  }
+}

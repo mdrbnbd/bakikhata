@@ -1,0 +1,10 @@
+node_modules/
+tools/node_modules/
+tools/package-lock.json
+*.jks
+*.keystore
+*.apk
+*.aab
+google-services.json
+.DS_Store
+tools/icon/master-*.png

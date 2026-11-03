@@ -1,0 +1,6 @@
+{
+  "appId": "com.dfaster.bakikhata",
+  "appName": "বাকি খাতা",
+  "webDir": "www",
+  "android": { "backgroundColor": "#0b6e4f" }
+}

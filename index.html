@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>বাকি খাতা — দোকানের ডিজিটাল হিসাব খাতা (Android অ্যাপ)</title>
+<meta name="description" content="বাকি খাতা: কাস্টমার ও সাপ্লায়ারের বাকি, নগদ/বাকি বেচাকেনা, ক্যাশবক্স, খরচ, রিপোর্ট PDF আর SMS তাগাদা — বাংলায়, অফলাইনে। ফ্রি Android অ্যাপ।">
+<meta name="theme-color" content="#0b6e4f">
+<meta property="og:title" content="বাকি খাতা — দোকানের ডিজিটাল হিসাব খাতা">
+<meta property="og:description" content="বাকি, বেচাকেনা, ক্যাশ ও খরচের হিসাব — বাংলায়, অফলাইনে। SMS-এ কাস্টমারকে জানান। ফ্রি Android অ্যাপ।">
+<meta property="og:image" content="https://dfaster.com/bakikhata/screenshots/home.jpg">
+<meta property="og:url" content="https://dfaster.com/bakikhata/">
+<link rel="icon" href="app/icons/favicon-32.png">
+<link rel="stylesheet" href="app/fonts.css">
+<style>
+:root{--g:#0b6e4f;--g2:#14a37a;--bg:#f4f7f5;--card:#fff;--tx:#14211b;--mu:#5b6b63;--bd:#e3ebe6;--red:#d63c3c}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1512;--card:#16201b;--tx:#e8f1ec;--mu:#9fb2a8;--bd:#24332b}}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;font-family:'Hind Siliguri',system-ui,sans-serif;background:var(--bg);color:var(--tx);line-height:1.6}
+a{color:var(--g2)}
+.wrap{max-width:1040px;margin:0 auto;padding:0 18px}
+header.hero{background:linear-gradient(150deg,#14a37a,#0b6e4f 60%,#08503a);color:#fff;padding:40px 0 70px}
+.top{display:flex;align-items:center;gap:12px;margin-bottom:36px}.top img{width:44px;height:44px;border-radius:12px}.top b{font-size:1.25rem}
+.top .sp{flex:1}.top a{color:#d9f2e7;text-decoration:none;font-size:.95rem}
+.hgrid{display:grid;grid-template-columns:1.1fr .9fr;gap:30px;align-items:center}
+h1{font-size:clamp(2rem,5vw,3.1rem);line-height:1.2;margin:0 0 12px}
+.lead{font-size:1.15rem;color:#e3f5ec;margin:0 0 24px}
+.dl{display:inline-flex;align-items:center;gap:12px;background:#fff;color:var(--g);font-weight:700;font-size:1.15rem;padding:14px 24px;border-radius:16px;text-decoration:none;box-shadow:0 10px 30px rgba(0,0,0,.18)}
+.dl small{display:block;font-weight:500;font-size:.8rem;color:var(--mu)}
+.meta{margin-top:14px;font-size:.9rem;color:#cfeee0}.meta a{color:#fff}
+.phone{justify-self:center;width:min(300px,80vw);border-radius:30px;border:8px solid #0a2a1f;box-shadow:0 24px 60px rgba(0,0,0,.35);overflow:hidden;background:#000}
+.phone img{display:block;width:100%}
+section{padding:54px 0 10px}h2{font-size:1.7rem;margin:0 0 6px}.sub{color:var(--mu);margin:0 0 24px}
+.feat{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+.f{background:var(--card);border:1px solid var(--bd);border-radius:18px;padding:18px}.f i{font-style:normal;font-size:1.6rem}.f h3{margin:6px 0 4px;font-size:1.1rem}.f p{margin:0;color:var(--mu);font-size:.95rem}
+.shots{display:flex;gap:16px;overflow-x:auto;padding-bottom:10px;scroll-snap-type:x mandatory}
+.shots figure{margin:0;flex:0 0 220px;scroll-snap-align:start}.shots img{width:100%;border-radius:20px;border:1px solid var(--bd);box-shadow:0 8px 24px rgba(0,0,0,.08)}
+.shots figcaption{text-align:center;color:var(--mu);font-size:.9rem;margin-top:6px}
+.steps{counter-reset:s;display:grid;gap:10px;padding:0;list-style:none}.steps li{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:12px 14px 12px 52px;position:relative}
+.steps li::before{counter-increment:s;content:counter(s);position:absolute;left:14px;top:12px;width:26px;height:26px;border-radius:50%;background:var(--g);color:#fff;display:grid;place-items:center;font-weight:700;font-size:.9rem}
+.note{background:var(--card);border:1px dashed var(--bd);border-radius:14px;padding:12px 14px;color:var(--mu);font-size:.95rem}
+.cta{text-align:center;padding:50px 0}
+footer{border-top:1px solid var(--bd);padding:22px 0 30px;text-align:center;color:var(--mu);font-size:.92rem}
+@media (max-width:760px){.hgrid{grid-template-columns:1fr}.phone{margin-top:10px}header.hero{padding-top:24px}}
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <div class="top"><img src="app/icons/icon-192.png" alt=""><b>বাকি খাতা</b><span class="sp"></span><a href="https://github.com/mdrbnbd/bakikhata" rel="noopener">সোর্স কোড ↗</a></div>
+    <div class="hgrid">
+      <div>
+        <h1>দোকানের বাকির হিসাব এখন মোবাইলে</h1>
+        <p class="lead">কাস্টমার ও সাপ্লায়ারের বাকি, নগদ/বাকি বেচাকেনা, ক্যাশবক্স, খরচ আর রিপোর্ট — সব বাংলায়। প্রতিটি লেনদেনের পর কাস্টমারকে SMS-এ জানান। ইন্টারনেট ছাড়াই চলে।</p>
+        <a class="dl" href="https://github.com/mdrbnbd/bakikhata/releases/latest/download/bakikhata.apk" rel="noopener">
+          <span style="font-size:1.6rem">⬇</span><span>APK ডাউনলোড করুন<small>Android ৭.০+ · ফ্রি · বিজ্ঞাপন নেই</small></span></a>
+        <div class="meta">সংস্করণ ১.০.০ · <a href="https://github.com/mdrbnbd/bakikhata/releases/latest" rel="noopener">রিলিজ নোট</a> · <a href="app/">ব্রাউজারে ডেমো দেখুন</a></div>
+      </div>
+      <div class="phone"><img src="screenshots/home.jpg" alt="বাকি খাতা অ্যাপের হোম স্ক্রিন" width="390" height="844"></div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section>
+    <h2>যা যা করতে পারবেন</h2>
+    <p class="sub">টালি খাতার মতো সহজ — দোকানদারের জন্য বানানো।</p>
+    <div class="feat">
+      <div class="f"><i>👥</i><h3>কাস্টমার ও সাপ্লায়ার</h3><p>নাম, ফোন, ঠিকানা, ছবি। নাম/নম্বর দিয়ে খুঁজুন, বাকি অনুযায়ী সাজান।</p></div>
+      <div class="f"><i>📒</i><h3>দিলাম / পেলাম খাতা</h3><p>প্রতি জনের আলাদা খাতা, চলতি ব্যালেন্স, এন্ট্রি এডিট ও মুছে ফেলা।</p></div>
+      <div class="f"><i>🛒</i><h3>ক্রয় ও বিক্রয়</h3><p>নগদ বা বাকি, আংশিক পরিশোধ, পণ্যের তালিকা — বাকি অংশ নিজে থেকেই খাতায় ওঠে।</p></div>
+      <div class="f"><i>💰</i><h3>ক্যাশবক্স ও খরচ</h3><p>দিনের ক্যাশ ইন/আউট, খাত অনুযায়ী খরচ, আজকের ও মাসের হিসাব, হাতে কত ক্যাশ।</p></div>
+      <div class="f"><i>📊</i><h3>রিপোর্ট ও PDF</h3><p>যেকোনো সময়ের বিক্রয়, ক্রয়, বাকি, ক্যাশ, খরচ, আনুমানিক লাভ — PDF করে শেয়ার।</p></div>
+      <div class="f"><i>✉️</i><h3>SMS ও তাগাদা</h3><p>লেনদেনের পর বাংলায় SMS, এক চাপে বাকির তাগাদা — SMS বা WhatsApp-এ।</p></div>
+      <div class="f"><i>🔒</i><h3>PIN লক</h3><p>অন্য কেউ যেন আপনার হিসাব দেখতে না পারে।</p></div>
+      <div class="f"><i>💾</i><h3>ব্যাকআপ</h3><p>এক ফাইলে সব হিসাব — Drive/WhatsApp-এ রাখুন, নতুন ফোনে ফেরত আনুন।</p></div>
+      <div class="f"><i>🌙</i><h3>ডার্ক মোড, অফলাইন</h3><p>সব তথ্য আপনার ফোনেই থাকে। কোনো বিজ্ঞাপন বা ট্র্যাকিং নেই।</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>স্ক্রিনশট</h2>
+    <p class="sub">মোবাইলের জন্য বানানো — বড় বাটন, পরিষ্কার বাংলা।</p>
+    <div class="shots">
+      <figure><img src="screenshots/home.jpg" alt="হোম ড্যাশবোর্ড" loading="lazy"><figcaption>হোম — পাবো/দেবো, আজকের হিসাব</figcaption></figure>
+      <figure><img src="screenshots/ledger.jpg" alt="কাস্টমারের খাতা" loading="lazy"><figcaption>কাস্টমারের খাতা</figcaption></figure>
+      <figure><img src="screenshots/sms.jpg" alt="SMS পাঠানো" loading="lazy"><figcaption>লেনদেনের পর SMS</figcaption></figure>
+      <figure><img src="screenshots/report-dark.jpg" alt="রিপোর্ট (ডার্ক মোড)" loading="lazy"><figcaption>রিপোর্ট · ডার্ক মোড</figcaption></figure>
+    </div>
+  </section>
+
+  <section>
+    <h2>কীভাবে ইনস্টল করবেন</h2>
+    <ol class="steps">
+      <li>উপরের <b>APK ডাউনলোড করুন</b> বাটনে চাপুন।</li>
+      <li>ডাউনলোড শেষ হলে ফাইলটি খুলুন। জিজ্ঞেস করলে “এই উৎস থেকে ইনস্টলের অনুমতি” দিন।</li>
+      <li><b>ইনস্টল</b> চাপুন, তারপর অ্যাপ খুলে দোকানের নাম, মালিকের নাম ও মোবাইল নম্বর দিন।</li>
+    </ol>
+    <p class="note">💡 ফোন বদলানোর আগে <b>সেটিংস → ব্যাকআপ ফাইল তৈরি</b> করে Drive বা WhatsApp-এ রেখে দিন। নতুন ফোনে অ্যাপ খুলে “ব্যাকআপ ফাইল থেকে ফেরত আনুন” চাপলেই সব হিসাব ফিরে আসবে। মোবাইল নম্বর + OTP দিয়ে লগইন ও ক্লাউড ব্যাকআপ শীঘ্রই আসছে।</p>
+  </section>
+
+  <div class="cta">
+    <a class="dl" href="https://github.com/mdrbnbd/bakikhata/releases/latest/download/bakikhata.apk" rel="noopener"><span style="font-size:1.6rem">⬇</span><span>বাকি খাতা APK<small>ফ্রি · বাংলা · অফলাইন</small></span></a>
+  </div>
+</main>
+<footer>Powered by Robin · <a href="https://dfaster.com/">dFaster.com</a></footer>
+</body>
+</html>
