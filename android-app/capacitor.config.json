@@ -2,8 +2,20 @@
   "appId": "com.dfaster.bakikhata",
   "appName": "dFaster Note",
   "webDir": "www",
-  "android": { "backgroundColor": "#0b6e4f" },
+  "android": {
+    "backgroundColor": "#0b6e4f"
+  },
   "plugins": {
-    "FirebaseAuthentication": { "skipNativeAuth": false, "providers": ["phone", "google.com"] }
+    "FirebaseAuthentication": {
+      "skipNativeAuth": false,
+      "providers": [
+        "phone",
+        "google.com"
+      ]
+    },
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_note",
+      "iconColor": "#0b6e4f"
+    }
   }
 }

@@ -15,14 +15,23 @@ A Bangla digital ledger (বাকি খাতা) app for shopkeepers, in the 
 - **ক্যাশবক্স.** Cash in/out, খরচ by category, today's and this month's totals, and cash in hand (with an opening cash amount).
 - **Dashboard.** মোট পাবো/দেবো, today's sale, purchase and cash, and quick-add buttons.
 - **Reports.** Any date range: sales, purchases, dues, cash, expenses, top dues and an estimated profit. Reports export as **PDF** (rendered as an image, so Bangla text shapes correctly) to the share sheet. Each party's statement also exports as PDF.
-- **SMS.** A Bangla SMS after each transaction.
-  - Default: opens the SMS app with the text pre-filled, so no permission is needed.
-  - Optional **অটো SMS**: sends directly with the `SEND_SMS` runtime permission.
+- **অটো SMS (v1.2, on by default).** A Bangla SMS goes out automatically after every দিলাম/পেলাম, due or cash sale, supplier purchase and edit ("সংশোধিত"), plus a cancellation SMS when an entry is deleted.
+  - Sent from the phone's own SIM with Android `SmsManager` (multipart for long Bangla text). Dual SIM: choose the SIM in Settings.
+  - `SEND_SMS` is asked the first time, after a Bangla explanation. If it is denied, the SMS app opens with the text instead.
+  - A toast shows "SMS পাঠানো হয়েছে" or why it failed. Every SMS has a status (গেছে / যায়নি / SMS অ্যাপে / নম্বর নেই) on the ledger row, in the entry form and in **SMS লগ** (resend from there).
+  - Parties without a phone are skipped. Turn অটো SMS off in Settings to get the old "ask first" sheet.
   - **তাগাদা** reminders can go out by SMS or WhatsApp.
-- **Shop profile.** Shop name, owner and phone, used in SMS and PDFs.
+- **Notifications (v1.2).** Asked on first launch (Android 13+) with a Bangla explanation; if they are off (e.g. Xiaomi/HyperOS), the app shows a note and a button to the system notification settings. Channels: SMS sent, SMS failed, sync, daily due reminder (time set in Settings).
+- **Payment methods and QR (v1.2).** In Profile → পেমেন্ট পদ্ধতি: any number of bKash/Nagad/Rocket/Upay (personal/merchant/agent) and bank accounts (bank, account name, number, branch, routing), one default.
+  - Scan or upload the shop's official Bangla QR (EMVCo). When collecting a due, the QR is regenerated **with the due amount** (tag 54, CRC recomputed): from the ledger's **পেমেন্ট QR**, automatically after a due sale, and from তাগাদা. Share it as an image to WhatsApp or by SMS.
+  - Without an official QR, an info card (number + amount) is shown and clearly labelled "not a payment QR".
+  - The default method is added to the automatic SMS. Bank account numbers are never put in SMS unless the owner turns that on per account.
+  - Payment is not confirmed automatically: the owner taps পেলাম when the money arrives.
+- **Profile (v1.2).** Photo, owner name, phone, email, shop name/type/address, payment methods, login method and account creation date; change password, link Google, log out, delete account (removes the cloud data and the login). Opened from the header avatar or the প্রোফাইল tab.
+  - **First-login setup wizard:** after registration or Google login (or the first offline start), a 4-step wizard asks for photo/name, shop details, payment methods and shows a summary. Every step can be skipped ("পরে করব"); Profile shows a completion bar and the missing items.
 - **Backup/restore.** A JSON file goes to the share sheet; restore it with the file picker, including from the first-run screen.
 - **PIN lock.** Re-locks after 60 s in the background.
-- Dark/light mode, Bangla numerals throughout, and a bottom navigation bar with Back.
+- Dark/light mode, Bangla numerals throughout, bundled SVG icons (Lucide) with coloured tiles, and a 6-tab bottom navigation bar (হোম, খাতা, বেচাকেনা, ক্যাশবক্স, রিপোর্ট, প্রোফাইল). The Android back button still works.
 - No ads, no tracking, no PWA install prompt.
 
 - **Login and cloud sync (v1.1).** Register with mobile number + password (one SMS OTP to verify the number), then log in with number + password on any phone; or log in with Google. Forgot password works with an OTP. Customers, suppliers, photos, ledger entries, sales, purchases, cash, expenses, products, shop profile and settings sync to Firebase (Firestore, per-user rules) and all come back after login on a new phone. See [CLOUD.md](CLOUD.md).
@@ -35,6 +44,9 @@ app/                  the app (HTML/CSS/JS, bundled into the APK)
   js/db.js            IndexedDB store with in-memory cache, soft deletes, dirty flags
   js/book.js          accounting: balances, ledger, sale/purchase posting, cash, reports
   js/native.js        SMS / WhatsApp / share via the BakiNative plugin (browser fallbacks)
+  js/pay.js           payment methods, EMVCo/Bangla QR parse + amount + CRC, QR image decode/generate
+  js/notify.js        local notifications (channels, permission, due reminder)
+  js/icons.js         Lucide SVG sprite + Ic() helper
   js/cloud.js         login (phone+password, OTP, Google) + Firestore sync engine (Android app only)
   js/pdf.js           HTML → PDF (html2canvas + jsPDF, vendored)
   js/app.js           screens and router
@@ -56,16 +68,18 @@ Releases are signed with a keystore that is kept outside the repo. The paths com
 ## Test
 ```bash
 python3 -m http.server 8231 &          # from the repo root
-node tools/test/e2e.js                  # 35 checks: registration, parties, দিলাম/পেলাম, sales, cash, report+PDF, backup/restore, sync engine, PIN
-node tools/test/cloud-auth.js           # 33 checks: register (OTP+password), login, wrong password, forgot password, Google, logout,
-                                        #   and a full wipe → login → restore of every collection, photo, profile and settings
+node tools/test/e2e.js                  # 47 checks: setup wizard, parties, দিলাম/পেলাম, sales, cash, report+PDF, backup/restore, sync, PIN, nav/icons, payment QR
+node tools/test/cloud-auth.js           # 53 checks: register, login, forgot password, Google, wizard, profile, change password, link, logout, delete account, wipe → restore
+node tools/test/pay-qr.js               # 14 checks: CRC16, EMVCo parse, tag 54 amount, decode-back of generated and photographed QR, info card, SMS line
+node tools/test/sms-auto.js             # 38 checks against a mocked Android bridge: permissions, auto send, SIM, multipart, edit/delete, failure, resend, notifications
 cd firebase && npx -y firebase-tools@latest emulators:exec --only firestore --project demo-bk "node ../tools/test/rules.test.js"   # 21 rules checks
 ```
 
 ## Notes
-- Google Play only allows `SEND_SMS` for apps whose core function is SMS. To publish on Play, remove the অটো SMS mode; the default compose-in-SMS-app mode needs no permission.
+- Google Play treats `SEND_SMS` (and `READ_PHONE_STATE`, used only for the SIM list) as restricted: a ledger app would need an approved Permissions Declaration, which is unlikely. The APK from GitHub is not affected. For a Play build, remove those two permissions; the app then falls back to opening the SMS app.
+- Auto SMS is sent from the shop's SIM and costs the normal operator SMS rate.
 - A Bangla SMS is billed per 70 characters (67 per part when the message is split).
 
-Fonts: Hind Siliguri (SIL OFL). PDF libraries: jsPDF and html2canvas (MIT).
+Fonts: Hind Siliguri (SIL OFL). PDF libraries: jsPDF and html2canvas (MIT). Icons: Lucide (ISC). QR: jsQR (Apache-2.0), qrcode-generator (MIT).
 
 Powered by Robin · [dFaster.com](https://dfaster.com)

@@ -1,6 +1,6 @@
 {
   "name": "bakikhata-app",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "license": "UNLICENSED",
   "dependencies": {
@@ -8,6 +8,7 @@
     "@capacitor-firebase/firestore": "^8.6.0",
     "@capacitor/android": "^8.6.0",
     "@capacitor/cli": "^8.6.0",
-    "@capacitor/core": "^8.6.0"
+    "@capacitor/core": "^8.6.0",
+    "@capacitor/local-notifications": "^8.3.1"
   }
 }

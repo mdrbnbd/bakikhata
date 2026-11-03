@@ -18,14 +18,15 @@ const PHOTO = 'data:image/jpeg;base64,' + 'A'.repeat(3000);
     const err = (code, message) => Object.assign(new Error(message || code), {code});
     const L = {};
     const pub = (st, uid) => { const u = st.users[uid]; return u && {uid, phoneNumber: u.phone || null, email: u.email || null, displayName: u.name || null,
-      providerData: u.providers.map(providerId => ({providerId}))}; };
+      providerData: u.providers.map(providerId => ({providerId})), metadata: {creationTime: u.created, lastSignInTime: u.last}}; };
     const auth = {
       addListener: async (ev, fn) => { L[ev] = fn; return {remove() { delete L[ev]; }}; },
       signInWithPhoneNumber: async ({phoneNumber}) => { const st = load(); st.pendingPhone = phoneNumber; st.log.push('sms:' + phoneNumber); save(st); setTimeout(() => L.phoneCodeSent({verificationId: 'vid-' + phoneNumber}), 30); },
       confirmVerificationCode: async ({verificationId, verificationCode}) => {
         const st = load(); if (verificationId !== 'vid-' + st.pendingPhone || verificationCode !== '123456') throw err('auth/invalid-verification-code');
         let uid = Object.keys(st.users).find(u => st.users[u].phone === st.pendingPhone);
-        if (!uid) { uid = 'uid-' + (++st.seq); st.users[uid] = {phone: st.pendingPhone, providers: ['phone']}; }
+        if (!uid) { uid = 'uid-' + (++st.seq); st.users[uid] = {phone: st.pendingPhone, providers: ['phone'], created: 1700000000000}; }
+        st.users[uid].last = Date.now();
         st.cur = uid; save(st); return {user: pub(st, uid)};
       },
       signInWithEmailAndPassword: async ({email, password}) => {
@@ -35,7 +36,7 @@ const PHOTO = 'data:image/jpeg;base64,' + 'A'.repeat(3000);
       },
       signInWithGoogle: async () => {
         const st = load(); let uid = Object.keys(st.users).find(u => st.users[u].google === 'robin@gmail.com');
-        if (!uid) { uid = 'uid-' + (++st.seq); st.users[uid] = {google: 'robin@gmail.com', email: 'robin@gmail.com', name: 'Robin', providers: ['google.com']}; }
+        if (!uid) { uid = 'uid-' + (++st.seq); st.users[uid] = {google: 'robin@gmail.com', email: 'robin@gmail.com', name: 'Robin', providers: ['google.com'], created: 1760000000000}; }
         st.cur = uid; save(st); return {user: pub(st, uid)};
       },
       linkWithEmailAndPassword: async ({email, password}) => {
@@ -44,6 +45,10 @@ const PHOTO = 'data:image/jpeg;base64,' + 'A'.repeat(3000);
         Object.assign(st.users[st.cur], {email, password}); st.users[st.cur].providers.push('password'); save(st); return {user: pub(st, st.cur)};
       },
       updatePassword: async ({newPassword}) => { const st = load(); st.users[st.cur].password = newPassword; save(st); },
+      linkWithGoogle: async () => { const st = load(); if (!st.cur) throw err('auth/no-current-user');
+        if (Object.keys(st.users).some(u => u !== st.cur && st.users[u].google === 'robin@gmail.com')) throw err('auth/credential-already-in-use');
+        Object.assign(st.users[st.cur], {google: 'robin@gmail.com'}); st.users[st.cur].providers.push('google.com'); save(st); return {user: pub(st, st.cur)}; },
+      deleteUser: async () => { const st = load(); if (!st.cur) throw err('auth/no-current-user'); delete st.users[st.cur]; st.cur = null; st.log.push('deleteUser'); save(st); },
       getCurrentUser: async () => { const st = load(); return {user: st.cur ? pub(st, st.cur) : null}; },
       signOut: async () => { const st = load(); st.cur = null; save(st); },
     };
@@ -57,9 +62,10 @@ const PHOTO = 'data:image/jpeg;base64,' + 'A'.repeat(3000);
       if (seg.length !== 2 && seg.length !== 4 && seg.length !== 3) throw err('permission-denied', path);
     }
     const fsP = {
-      getCollection: async ({reference, compositeFilter}) => { const st = load(); allow(st, reference + '/x'); const since = compositeFilter.queryConstraints[0].value;
-        return {snapshots: Object.keys(st.docs).filter(k => k.startsWith(reference + '/') && k.split('/').length === reference.split('/').length + 1 && st.docs[k].updatedAt > since).map(k => ({data: st.docs[k]}))}; },
-      writeBatch: async ({operations}) => { const st = load(); operations.forEach(o => allow(st, o.reference, o.data)); operations.forEach(o => st.docs[o.reference] = o.data); save(st); },
+      getCollection: async ({reference, compositeFilter}) => { const st = load(); allow(st, reference + '/x'); const since = compositeFilter ? compositeFilter.queryConstraints[0].value : -Infinity;
+        return {snapshots: Object.keys(st.docs).filter(k => k.startsWith(reference + '/') && k.split('/').length === reference.split('/').length + 1 && st.docs[k].updatedAt > since).map(k => ({id: k.split('/').pop(), path: k, data: st.docs[k]}))}; },
+      writeBatch: async ({operations}) => { const st = load(); operations.forEach(o => allow(st, o.reference, o.data)); operations.forEach(o => { if (o.type === 'delete') delete st.docs[o.reference]; else st.docs[o.reference] = o.data; }); save(st); },
+      deleteDocument: async ({reference}) => { const st = load(); allow(st, reference); delete st.docs[reference]; save(st); },
       setDocument: async ({reference, data, merge}) => { const st = load(); allow(st, reference, data); st.docs[reference] = merge ? {...(st.docs[reference] || {}), ...data} : data; save(st); },
       getDocument: async ({reference}) => { const st = load(); allow(st, reference); return {snapshot: {data: st.docs[reference] || null}}; },
     };
@@ -96,7 +102,13 @@ const PHOTO = 'data:image/jpeg;base64,' + 'A'.repeat(3000);
   const uidA = Object.keys(m.users).find(u => m.users[u].phone === '+8801811111111');
   ok(m.users[uidA].email === '8801811111111@phone.dfaster.com' && m.users[uidA].password === 'secret12' && m.users[uidA].providers.join() === 'phone,password',
     'password linked to the phone account (same uid, synthetic email)');
-  ok(await pg.$eval('#onboard', e => e.classList.contains('hidden')) && (await pg.$eval('#shopTitle', e => e.textContent)) === 'রহিম স্টোর', 'registered and inside the app');
+  ok(!!(await pg.$('#onboard:not(.hidden) .wsteps')) && (await pg.$eval('#wShop', e => e.value)) === 'রহিম স্টোর', 'after registration: profile setup wizard (step 2, shop prefilled)');
+  await pg.screenshot({path: OUT + '/setup-wizard.png'});
+  await pg.click('#wType [data-v="ফার্মেসি"]'); await typeIn('#wAddr', 'বনানী'); await pg.click('#wNext'); await sleep(300);
+  ok(!!(await pg.$('#wMfs')), 'wizard step 3: payment methods');
+  await pg.click('#wSkip'); await sleep(600);
+  ok(await pg.$eval('#onboard', e => e.classList.contains('hidden')) && (await pg.$eval('#shopTitle', e => e.textContent)) === 'রহিম স্টোর', 'skip for later → registered and inside the app');
+  ok(await pg.evaluate(() => { const p = DB.meta.get('profile'); return p.shopType === 'ফার্মেসি' && p.address === 'বনানী' && !!p.setupSkippedAt; }), 'wizard answers saved (type, address) + skipped flag');
 
   // ---------- 2. use every feature, then sync ----------
   const counts = await pg.evaluate(async photo => {
@@ -165,13 +177,49 @@ const PHOTO = 'data:image/jpeg;base64,' + 'A'.repeat(3000);
   // ---------- 5. logout → local data cleared, data still on server ----------
   await pg.goto(BASE + '#/settings', {waitUntil: 'networkidle0'}); await sleep(400);
   await pg.screenshot({path: OUT + '/auth-settings.png'});
-  await pg.click('#sOut'); await sleep(250); await pg.click('#cfOk'); await sleep(1500);
+  // ---------- 5a. profile page ----------
+  await pg.click('#meBtn'); await sleep(500);
+  const prof = await pg.evaluate(() => ({methods: document.querySelector('.kv .chips').textContent, created: document.querySelector('#acCreated').textContent, done: document.querySelector('#prDone').textContent,
+    pw: !!document.querySelector('#acPw'), linkG: !!document.querySelector('#acLinkG'), linkP: !!document.querySelector('#acLinkP'), nav: document.querySelector('[data-nav=profile]').classList.contains('on')}));
+  console.log('   profile:', JSON.stringify(prof));
+  ok(prof.methods.includes('মোবাইল + পাসওয়ার্ড') && prof.created.includes('২০২৩') && prof.pw && prof.linkG && !prof.linkP && prof.nav, 'profile: login method, created date, change password + link Google, nav highlight');
+  ok(/প্রোফাইল .*% সম্পূর্ণ/.test(prof.done) && prof.done.includes('পেমেন্ট পদ্ধতি'), 'profile completion indicator lists missing items');
+  await typeIn('#prName', 'রহিম উদ্দিন'); await typeIn('#prEmail', 'rahim@example.com'); await pg.click('#prSave'); await sleep(300);
+  await pg.click('#pmBank'); await sleep(200);
+  await typeIn('#bkB', 'ডাচ-বাংলা ব্যাংক'); await typeIn('#bkA', 'রহিম স্টোর'); await typeIn('#bkN', '1234567890123'); await typeIn('#bkBr', 'বনানী'); await pg.click('#bkS'); await sleep(300);
+  await pg.click('#pmMfs'); await sleep(200); await pg.click('#mfP [data-v=nagad]'); await pg.click('#mfT [data-v=merchant]'); await typeIn('#mfN', '01811111111'); await pg.click('#mfS'); await sleep(300);
+  const pms = await pg.$$eval('#pmList .pm', r => r.map(x => x.textContent));
+  ok(pms.length === 2 && pms[0].includes('ডিফল্ট') && pms[0].includes('ডাচ') && !pms[0].includes('1234567890123') && !pms[0].includes('১২৩৪৫৬৭৮৯০১২৩'), 'payment methods: bank (default, account number masked) + Nagad merchant');
+  await pg.click('#pmList .pm:nth-child(2) [data-pmdef]'); await sleep(300);
+  ok((await pg.$eval('#pmList .pm', e => e.textContent)).includes('নগদ'), 'set Nagad as default');
+  await pg.screenshot({path: OUT + '/profile.png', fullPage: true});
+  await pg.click('#acPw'); await sleep(200);
+  await typeIn('#cpOld', 'wrongold'); await typeIn('#cpNew', 'brandnew7'); await typeIn('#cpNew2', 'brandnew7'); await pg.click('#cpGo'); await sleep(400);
+  ok((await toast()).includes('ভুল') && (await mock()).users[uidA].password === 'newpass9', 'change password: wrong current password rejected');
+  await typeIn('#cpOld', 'newpass9'); await pg.click('#cpGo'); await sleep(500);
+  ok((await mock()).users[uidA].password === 'brandnew7', 'change password works');
+  await pg.click('#acLinkG'); await sleep(600);
+  ok((await mock()).users[uidA].providers.includes('google.com'), 'link Google to the phone account (same uid)');
+  await sleep(300); m = await mock();
+  await pg.evaluate(() => Cloud.sync());  m = await mock();
+  const ap = m.docs['users/' + uidA].profile;
+  ok(ap.ownerName === 'রহিম উদ্দিন' && ap.email === 'rahim@example.com' && ap.pay.methods.length === 2 && ap.pay.methods.some(x => x.accNo === '1234567890123'), 'profile + payment methods synced to users/{uid} (bank number only in own doc)');
+  ok(!JSON.stringify(m.docs['users/' + uidA].settings || {}).includes('1234567890123'), 'bank number not in settings');
+  await pg.click('#acOut'); await sleep(250); await pg.click('#cfOk'); await sleep(1500);
   ok(await pg.$eval('#aLogin', e => !e.classList.contains('hidden')) && await pg.evaluate(() => DB._mem.parties.size === 0), 'logout clears this phone and shows login');
+  // the Google account is now linked to uidA: undo for the next section by removing that link in the mock
+  await pg.evaluate(() => { const st = JSON.parse(localStorage.getItem('__mockfb')); Object.values(st.users).forEach(u => { if (u.phone) { delete u.google; u.providers = u.providers.filter(x => x !== 'google.com'); } }); localStorage.setItem('__mockfb', JSON.stringify(st)); });
 
   // ---------- 6. Google: new account → shop form → own data, separate uid ----------
   await pg.click('#aGoogle'); await sleep(1200);
-  ok(!!(await pg.$('#onboard:not(.hidden) #oShop')) && (await pg.$eval('#oOwner', e => e.value)) === 'Robin', 'Google new user: asked for shop info (owner prefilled)');
-  await typeIn('#oShop', 'রবিন শপ'); await typeIn('#oPhone', '01611111111'); await pg.click('#oGo'); await sleep(300);
+  ok(!!(await pg.$('#onboard:not(.hidden) #wName')) && (await pg.$eval('#wName', e => e.value)) === 'Robin', 'Google new user: setup wizard step 1 (name prefilled)');
+  await typeIn('#wPhone', '01611111111'); await pg.click('#wNext'); await sleep(250);
+  await pg.click('#wNext'); await sleep(200); ok((await toast()).includes('দোকানের নাম'), 'wizard: shop name required');
+  await typeIn('#wShop', 'রবিন শপ'); await pg.click('#wType [data-v="other"]'); await typeIn('#wTypeO', 'মোবাইল সার্ভিসিং'); await pg.click('#wNext'); await sleep(250);
+  await pg.click('#wNext'); await sleep(250);
+  ok((await pg.$eval('#onboard h2', e => e.textContent)).includes('%'), 'wizard summary shows completion %');
+  await pg.click('#wNext'); await sleep(400);
+  ok(await pg.evaluate(() => { const p = DB.meta.get('profile'); return p.shopType === 'মোবাইল সার্ভিসিং' && p.setupDone === true && p.email === 'robin@gmail.com'; }), 'wizard: custom business type, setupDone, Google email kept');
   await pg.evaluate(async () => { await Book.saveParty({type: 'customer', name: 'গুগল কাস্টমার'}); await Cloud.sync(); });
   m = await mock(); const uidG = Object.keys(m.users).find(u => m.users[u].google);
   ok(uidG && uidG !== uidA && m.docs['users/' + uidG].profile.shopName === 'রবিন শপ' && Object.keys(m.docs).some(k => k.startsWith(`users/${uidG}/parties/`)), 'Google account syncs under its own uid');
@@ -183,9 +231,24 @@ const PHOTO = 'data:image/jpeg;base64,' + 'A'.repeat(3000);
   // ---------- 7. "use without login" still works ----------
   await pg.evaluate(async () => { await Cloud.signOut(); }); await freshInstall();
   await pg.click('#aLocal'); await sleep(200);
-  await typeIn('#oShop', 'লোকাল'); await typeIn('#oOwner', 'ক'); await typeIn('#oPhone', '01511111111'); await pg.click('#oGo'); await sleep(400);
+  await typeIn('#wName', 'ক'); await typeIn('#wPhone', '01511111111'); await pg.click('#wNext'); await sleep(250);
+  await typeIn('#wShop', 'লোকাল'); await pg.click('#wSkip'); await sleep(500);
   ok(await pg.$eval('#onboard', e => e.classList.contains('hidden')) && !!(await pg.$('#hLogin')), 'local-only mode works and home suggests login');
 
+  // ---------- 8. delete account (Google): confirm twice → Firestore data + auth user gone ----------
+  await pg.evaluate(async () => { await Cloud.signOut(); }); await freshInstall();
+  await pg.click('#aGoogle'); await sleep(1500);
+  m = await mock(); const uidG2 = Object.keys(m.users).find(u => m.users[u].google);
+  ok(Object.keys(m.docs).some(k => k.startsWith('users/' + uidG2)), 'Google account has cloud data before delete');
+  await pg.click('#meBtn'); await sleep(400); await pg.click('#acDel'); await sleep(200); await pg.click('#cfOk'); await sleep(200);
+  await pg.type('#dcTxt', 'ভুল'); await pg.click('#dcGo'); await sleep(200);
+  ok((await mock()).users[uidG2], 'delete needs the word মুছুন');
+  await typeIn('#dcTxt', 'মুছুন'); await pg.click('#dcGo'); await sleep(1200);
+  m = await mock();
+  ok(!m.users[uidG2] && !Object.keys(m.docs).some(k => k.startsWith('users/' + uidG2)) && m.log.includes('deleteUser'), 'delete account: auth user and all Firestore docs removed');
+  ok(Object.keys(m.docs).some(k => k.startsWith('users/' + uidA + '/')), 'other accounts untouched');
+  await sleep(1500);
+  ok(await pg.evaluate(() => DB._mem.parties.size === 0), 'this phone wiped after delete');
   ok(errs.length === 0, 'no JS errors ' + JSON.stringify(errs));
   console.log(`\n${pass} passed, ${fail} failed`); await b.close(); process.exit(fail ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(2); });

@@ -15,13 +15,14 @@
 (() => {
 'use strict';
 const OVERLAP = 5 * 60 * 1000;   // re-pull a 5-minute window to tolerate clock skew between phones (merge is idempotent)
-const LOCAL_ONLY_SETTINGS = ['pinHash', 'pinSalt', 'lastBackup'];
+const LOCAL_ONLY_SETTINGS = ['pinHash', 'pinSalt', 'lastBackup', 'smsSim', 'smsSimLabel', 'smsPermAsked', 'notifAsked', 'notifOff'];
 
 // keep rows inside the size limits firestore.rules enforces, so one odd row can never block a whole sync batch
 const fit = d => { const o = {...d}; if (typeof o.name === 'string') o.name = o.name.slice(0, 200); if (typeof o.note === 'string') o.note = o.note.slice(0, 1000);
   if (typeof o.photo === 'string' && o.photo.length > 400000) o.photo = null; return o; };
 const mapUser = u => u && {uid: u.uid, phone: u.phoneNumber || null, email: u.email || null, name: u.displayName || null,
-  providers: (u.providerData || []).map(p => p.providerId)};
+  providers: (u.providerData || []).map(p => p.providerId),
+  created: (u.metadata && u.metadata.creationTime) || null, lastLogin: (u.metadata && u.metadata.lastSignInTime) || null};
 
 /* ---------- Firebase adapter (Capacitor Firebase plugins, native SDKs) ---------- */
 function firebaseAdapter() {
@@ -30,17 +31,28 @@ function firebaseAdapter() {
   const col = (uid, store) => `users/${uid}/${store}`;
   return {
     name: 'firebase',
-    sendOtp: phone => new Promise(async (resolve, reject) => {
+    sendOtp: (phone, {link = false} = {}) => new Promise(async (resolve, reject) => {
       const hs = []; let settled = false;
       const done = (f, v) => { if (settled) return; settled = true; hs.forEach(h => h && h.remove && h.remove()); f(v); };
       hs.push(await Auth.addListener('phoneCodeSent', e => done(resolve, {verificationId: e.verificationId})));
       hs.push(await Auth.addListener('phoneVerificationCompleted', e => done(resolve, {user: mapUser(e.user)})));
       hs.push(await Auth.addListener('phoneVerificationFailed', e => done(reject, Object.assign(new Error(e.message || 'OTP পাঠানো যায়নি'), {code: e.code}))));
-      Auth.signInWithPhoneNumber({phoneNumber: phone}).catch(err => done(reject, err));
+      (link ? Auth.linkWithPhoneNumber({phoneNumber: phone}) : Auth.signInWithPhoneNumber({phoneNumber: phone})).catch(err => done(reject, err));
     }),
     async confirmOtp(verificationId, code) { const r = await Auth.confirmVerificationCode({verificationId, verificationCode: code}); return mapUser(r.user); },
     async signInPassword(email, password) { const r = await Auth.signInWithEmailAndPassword({email, password}); return mapUser(r.user); },
     async signInGoogle() { const r = await Auth.signInWithGoogle(); return mapUser(r.user); },
+    async linkGoogle() { const r = await Auth.linkWithGoogle(); return mapUser(r.user || (await Auth.getCurrentUser()).user); },
+    async linkPassword(email, password) { await Auth.linkWithEmailAndPassword({email, password}); return mapUser((await Auth.getCurrentUser()).user); },
+    async deleteData(uid, stores) {   // every row of every store, then the account doc (rules allow owner deletes only)
+      for (const st of stores) {
+        const r = await Fs.getCollection({reference: col(uid, st)});
+        const refs = (r.snapshots || []).map(x => x.path || `${col(uid, st)}/${x.id}`);
+        for (let i = 0; i < refs.length; i += 400) await Fs.writeBatch({operations: refs.slice(i, i + 400).map(reference => ({type: 'delete', reference}))});
+      }
+      await Fs.deleteDocument({reference: `users/${uid}`});
+    },
+    deleteUser: () => Auth.deleteUser(),
     async setPassword(email, password) {
       const cur = mapUser((await Auth.getCurrentUser()).user);
       if (!cur) throw new Error('আগে OTP যাচাই করুন');
@@ -111,9 +123,39 @@ async function setPassword(phone, password) {   // after OTP: link (first time) 
   const u = await wrap(() => adapter.setPassword(phoneEmail(phone), password));
   await signedIn(u); return u;
 }
+// link the other login method to the SAME account (same uid → same data)
+async function linkGoogle() { need(); const u = await wrap(() => adapter.linkGoogle()); await DB.meta.set('cloudUser', u); return u; }
+async function linkPhoneStart(phone) { need(); return wrap(() => adapter.sendOtp(U.e164(phone), {link: true})); }   // → {verificationId} | {user}
+async function linkPhoneFinish(phone, password) {   // after the link OTP is confirmed: add the phone+password login
+  if (String(password).length < 6) throw new Error('পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের দিন');
+  const u = await wrap(() => adapter.linkPassword(phoneEmail(phone), password)); await DB.meta.set('cloudUser', u); return u;
+}
+async function refreshUser() { if (!enabled() || !user()) return null; try { const u = await adapter.currentUser(); if (u && u.uid === user().uid) { await DB.meta.set('cloudUser', u); return u; } } catch (e) {} return user(); }
+// re-check who is signed in (Firebase wants a recent login before deleting the account)
+async function reauth({phone, password} = {}) {
+  need(); const me = user(); if (!me) throw new Error('লগইন করা নেই');
+  const u = password ? await wrap(() => adapter.signInPassword(phoneEmail(phone), password)) : await wrap(() => adapter.signInGoogle());
+  if (!u || u.uid !== me.uid) { await adapter.signOut().catch(() => {}); throw new Error('অন্য অ্যাকাউন্টে লগইন হয়েছে — একই অ্যাকাউন্ট দিয়ে আবার চেষ্টা করুন'); }
+  return u;
+}
+// phone accounts: change the password after re-checking the current one
+async function changePassword(phone, oldPw, newPw) {
+  if (String(newPw).length < 6) throw new Error('নতুন পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের দিন');
+  await reauth({phone, password: oldPw});
+  const u = await wrap(() => adapter.setPassword(phoneEmail(phone), newPw)); await DB.meta.set('cloudUser', u); return u;
+}
+// permanently delete: all Firestore data, the Firebase Auth user, then this phone's copy
+async function deleteAccount() {
+  need(); const me = user(); if (!me) throw new Error('লগইন করা নেই');
+  await wrap(() => adapter.deleteData(me.uid, DB.SYNCED));
+  await wrap(() => adapter.deleteUser());
+  await adapter.signOut().catch(() => {});
+  await DB.wipe();
+}
 async function signedIn(u) {
   await DB.meta.set('cloudUser', u);
-  await sync(true);
+  const r = await sync(true);
+  if (r && r.pulled && window.Notify) Notify.show('sync', '☁️ হিসাব ফিরে এসেছে', `আপনার অ্যাকাউন্ট থেকে ${U.bn(r.pulled)}টি হিসাব এই ফোনে এসেছে।`);
 }
 async function signOut({wipe = true} = {}) {
   if (enabled() && user()) { try { await sync(); } catch (e) { console.warn('final sync', e); } }
@@ -164,12 +206,20 @@ async function sync(full = false) {
   try { return await syncing; } finally { syncing = null; }
 }
 let timer;
-function schedule() { if (!enabled() || !user()) return; clearTimeout(timer); timer = setTimeout(() => sync().catch(e => console.warn('sync', e)), 4000); }
+let lastFailNote = 0;
+function schedule() {
+  if (!enabled() || !user()) return; clearTimeout(timer);
+  timer = setTimeout(() => sync().catch(e => {
+    console.warn('sync', e);
+    // background sync failed: tell the owner at most once an hour (offline is normal, so only when changes are waiting)
+    if (window.Notify && unsynced() && Date.now() - lastFailNote > 3600e3) { lastFailNote = Date.now(); Notify.show('sync', 'ক্লাউড সিঙ্ক হয়নি', `${U.bn(unsynced())}টি পরিবর্তন এখনও আপলোড হয়নি — ইন্টারনেট এলে নিজে থেকে হবে।`); }
+  }), 4000);
+}
 // any local edit → push a few seconds later
 DB.on((store, rec) => { if (!rec) return; if ((DB.SYNCED.includes(store) && rec.dirty) || (store === 'meta' && ['profile', 'settings'].includes(rec.key))) schedule(); });
 
 window.Cloud = {enabled, status, loginPassword, loginGoogle, sendOtp, confirmOtp, setPassword, signOut, sync, schedule, user,
-  unsynced, phoneEmail, errText, completeSignIn: signedIn,
+  unsynced, phoneEmail, errText, completeSignIn: signedIn, linkGoogle, linkPhoneStart, linkPhoneFinish, refreshUser, reauth, deleteAccount, changePassword,
   _setAdapter(a) { adapter = a; }   // tests / future backends
 };
 })();

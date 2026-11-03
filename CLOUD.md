@@ -1,6 +1,6 @@
 # dFaster Note: login and cloud sync (Firebase)
 
-**Status in v1.1.0: on.** Firebase project `baki-khata-7e633` (Spark plan, no billing). Package `com.dfaster.bakikhata`.
+**Status in v1.2.0: on.** Firebase project `baki-khata-7e633` (Spark plan, no billing). Package `com.dfaster.bakikhata`.
 
 ## What is set up (done from the CLI, see `firebase/`)
 
@@ -18,15 +18,18 @@
 
 - **Register:** shop name, owner, phone, password (≥ 6, typed twice, show/hide 👁) → one SMS OTP (Firebase Phone Auth) → the password is attached to the same account with `linkWithEmailAndPassword` using a synthetic email `8801XXXXXXXXX@phone.dfaster.com` (never shown, never mailed; set in `app/firebase-config.js`, do not change after launch).
 - **Login:** phone + password → `signInWithEmailAndPassword(synthetic email)`. **No SMS** is used for normal logins.
-- **Forgot password:** phone → OTP → new password (`updatePassword`). Settings → 🔑 পাসওয়ার্ড বদলান uses the same flow.
-- **Google:** "Google দিয়ে লগইন" (`signInWithGoogle`, native Credential Manager). A new Google account is asked for the shop name once.
-- A Google account and a phone account are **separate** accounts (separate data). Linking them is not built yet.
+- **Forgot password:** phone → OTP → new password (`updatePassword`).
+- **Change password (v1.2):** Profile → পাসওয়ার্ড বদলান → current password (re-authentication, no SMS) → new password twice.
+- **Google:** "Google দিয়ে লগইন" (`signInWithGoogle`, native Credential Manager).
+- **First-login setup (v1.2):** after registration or a Google login, if the profile is incomplete, a 4-step wizard (photo + owner name + phone → shop name, type, address → payment methods → summary) runs. Each step can be skipped; `setupDone` / `setupSkippedAt` are stored in the profile so it is not shown again, and Profile shows the completion percentage.
+- **Link the other login (v1.2):** Profile → Google যুক্ত করুন links Google to a phone+password account (`linkWithGoogle`); a Google account can add a phone + password (needs Phone auth, i.e. an OTP). Accounts that were created separately stay separate.
+- **Delete account (v1.2):** Profile → একাউন্ট মুছে ফেলুন → confirm, type "মুছুন", password (or Google) re-authentication → all `users/{uid}` data and the Auth user are deleted, then the phone is cleared.
 - **লগইন ছাড়া চালান:** still possible; data stays on the phone and the home screen keeps suggesting login. Logging in later uploads it.
 - **Logout:** syncs first, then clears the phone (so the next person who logs in on that phone does not see or merge it).
 
 ## Data (everything a user has)
 
-- `users/{uid}` → `{profile, settings, updatedAt}`: shop name/owner/phone/address and settings (theme, SMS options, opening cash). PIN hash/salt and the last-backup time stay on the phone.
+- `users/{uid}` → `{profile, settings, updatedAt}`: profile = photo (256 px JPEG), owner, phone, email, shop name/type/address, payment methods (MFS numbers, bank accounts, the uploaded QR payload or a ≤600 px QR image), setup state; settings = theme, auto-SMS, notification and reminder options, opening cash. Only the owner can read this doc (rules). PIN hash/salt, the chosen SIM, permission flags and the last-backup time stay on the phone; the SMS log stays on the phone too.
 - `users/{uid}/{parties|entries|txns|cash|products}/{id}`: customers & suppliers (with photo, a ≤160 px JPEG inside the row), ledger entries, sales & purchases, cash in/out & expenses, products.
 - Offline first: the UI reads IndexedDB; changes sync 4 s later, at start-up, and when the network comes back. Rows resolve last-writer-wins on `updatedAt`, deletes travel as tombstones; profile/settings resolve last-writer-wins on `_at`.
 - **New phone / reinstall:** log in → full pull of the account doc and all five collections. `tools/test/cloud-auth.js` tests a complete wipe → login → restore (counts, balances, cash in hand, photo, profile, settings, tombstones).

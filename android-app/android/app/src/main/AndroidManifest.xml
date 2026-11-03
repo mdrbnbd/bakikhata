@@ -39,8 +39,12 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <!-- only used by the optional "অটো SMS" mode, requested at runtime when the user turns it on -->
+    <!-- "অটো SMS": requested at runtime (with a Bangla explanation) the first time an SMS is sent -->
     <uses-permission android:name="android.permission.SEND_SMS" />
+    <!-- only to list SIMs when the user opens the SIM picker (dual-SIM phones) -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <!-- Android 13+: asked on first launch (SMS status, sync status, due reminders) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
 
     <!-- let composeSms / openUrl find SMS, WhatsApp and dialer apps on Android 11+ -->

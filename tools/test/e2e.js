@@ -25,10 +25,22 @@ const ok = (c, m) => { if (c) { pass++; console.log('✔', m); } else { fail++; 
 
   // 1. registration
   ok(await pg.$eval('#onboard', e => !e.classList.contains('hidden')), 'registration screen shown on first launch');
-  await type('#oShop', 'মায়ের দোয়া স্টোর'); await type('#oOwner', 'রবিন'); await type('#oPhone', '01712345678');
-  await click('#oGo'); await sleep(300);
+  // setup wizard: 1 পরিচয় → 2 দোকান → 3 পেমেন্ট (skip) → 4 done
+  ok(await pg.$('#onboard .wsteps') !== null, 'profile setup wizard shown (step indicator)');
+  await type('#wName', 'রবিন'); await type('#wPhone', '01712345678'); await click('#wNext'); await sleep(200);
+  await type('#wShop', 'মায়ের দোয়া স্টোর'); await click('#wType [data-v="মুদি দোকান"]'); await type('#wAddr', 'কাওরান বাজার, ঢাকা'); await click('#wNext'); await sleep(200);
+  ok(await pg.$('#wMfs') !== null, 'wizard step 3: payment methods');
+  await click('#wMfs'); await click('#mfP [data-v=bkash]'); await click('#mfT [data-v=personal]'); await type('#mfN', '01712345678'); await click('#mfS'); await sleep(300);
+  ok((await pg.$$('#onboard .pm')).length === 1, 'wizard: bKash number added in step 3');
+  await click('#wNext'); await sleep(200);
+  ok((await txt('#onboard h2')).includes('৮৬%'), 'wizard done: completion 86% (photo missing) — ' + await txt('#onboard h2'));
+  await click('#wNext'); await sleep(300);
   ok(await pg.$eval('#onboard', e => e.classList.contains('hidden')), 'registration saved locally (cloud off)');
   ok((await txt('#shopTitle')) === 'মায়ের দোয়া স্টোর', 'shop name in header');
+  ok((await pg.$$('#bottomNav button')).length === 6 && !(await pg.$('[data-nav=back]')), 'bottom nav: 6 items, no পেছনে button');
+  ok((await pg.$$('#quick .tile svg use')).length === 8 && (await pg.$$('#bottomNav svg use')).length === 6, 'SVG icons in quick tiles and bottom nav');
+  ok(await pg.$eval('[data-nav=home]', e => e.classList.contains('on')), 'active nav highlight on হোম');
+  ok(await pg.evaluate(() => !/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/u.test(document.querySelector('#quick').textContent + document.querySelector('#bottomNav').textContent + document.querySelector('.top').textContent)), 'no emoji in quick grid, nav, header');
 
   // 2. customer with opening due
   await click('#quick [data-q=customer]');
@@ -63,7 +75,14 @@ const ok = (c, m) => { if (c) { pass++; console.log('✔', m); } else { fail++; 
   await type('#tpaid', '60'); await click('#tsave'); await sleep(300);
   const sms2 = await pg.$eval('#smsT', e => e.value); console.log('   SMS:', sms2);
   ok(sms2.includes('বাকি ৳১০০') && sms2.includes('মোট বাকি: ৳১,১০০'), 'due-sale SMS: due ৳১০০, balance ৳১,১০০');
-  await click('#sheetCard [data-close].btn');
+  ok(sms2.includes('পেমেন্ট') && sms2.includes('বিকাশ'), 'due SMS includes payment info (bKash)');
+  await click('#sheetCard [data-close].btn'); await sleep(400);
+  // a due sale auto-opens the payment QR with the new due
+  ok(await pg.$('#pqImg') !== null, 'payment QR sheet opens automatically after a due sale');
+  await pg.waitForFunction(() => document.querySelector('#pqImg') && document.querySelector('#pqImg').src.startsWith('data:image/png'), {timeout: 10000});
+  ok((await pg.$eval('#pqAmt', e => e.value)) === '1100' && (await txt('#pqNote')).includes('তথ্য কার্ড'), 'QR card: amount ৳1100, labelled as info card (not a payment QR)');
+  await shot('bakikhata-payqr.png');
+  await pg.evaluate(() => BK.closeSheet()); await sleep(200);
   // 7. supplier + due purchase
   await click('[data-nav=trade]'); await click('.tabs [data-t=purchase]'); await click('#tDue');
   await pg.select('#tparty', '__new'); await sleep(200);
@@ -154,6 +173,8 @@ const ok = (c, m) => { if (c) { pass++; console.log('✔', m); } else { fail++; 
   ok((await txt('#pbal')).includes('৯০০'), 'edited entry → balance ৳৯০০');
   rowsE = await pg.$$('#ledBody tr[data-entry]'); await rowsE[1].click(); await sleep(200);
   await click('#edel'); await click('#cfOk'); await sleep(400);
+  ok(await sheetOpen() && (await pg.$eval('#smsT', e => e.value)).includes('বাতিল'), 'delete → cancellation SMS offered');
+  await pg.evaluate(() => BK.closeSheet()); await sleep(200);
   ok((await txt('#pbal')).includes('১,৬০০'), 'deleted পেলাম → balance ৳১,৬০০');
   await click('[data-nav=home]');
   ok((await txt('#cashHand')).includes('২৬০'), 'linked cash row removed too (cash ৳২৬০)');
